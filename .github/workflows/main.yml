@@ -142,8 +142,8 @@ jobs:
               `| Linhas   | ${coveredLines} | ${missedLines} | **${pctLine}%** |`,
               `| Branches | ${coveredBranch} | ${missedBranch} | **${pctBranch}%** |`,
               '',
-              `> Gate mínimo configurado no \`pom.xml\`: **80% de linhas**`,
-              `> 🔍 [Ver análise completa no SonarCloud](https://sonarcloud.io/project/overview?id=HLN-lobo_biblioteca)`,
+              `> Gate mínimo configurado no \`pom.xml\`: **50% de linhas**`,
+              `> 🔍 [Ver análise completa no SonarCloud](https://sonarcloud.io/project/overview?id=peeduardo_migus-backend)`,
             ].join('\n');
 
             const { data: comments } = await github.rest.issues.listComments({
