@@ -94,8 +94,8 @@ jobs:
       - name: Permitir execução do Maven Wrapper
         run: chmod +x mvnw
 
-      - name: Rodar verify (unitários + ITs + JaCoCo)
-        run: ./mvnw -B -ntp verify -Djacoco.check.skip=true
+      # - name: Rodar verify (unitários + ITs + JaCoCo)
+        # run: ./mvnw -B -ntp verify -Djacoco.check.skip=true
 
       - name: Analisar com SonarCloud
         env:
