@@ -41,9 +41,9 @@
             sonar.organization  → nome da sua org no SonarCloud
             sonar.projectKey    → chave criada ao adicionar o projeto no SonarCloud
         -->
-        <sonar.organization>hln-lobo</sonar.organization>
+        <sonar.organization>peeduardo</sonar.organization>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
-        <sonar.projectKey>HLN-lobo_biblioteca</sonar.projectKey>
+        <sonar.projectKey>peeduardo_migus-backend</sonar.projectKey>
 
         <sonar.coverage.jacoco.xmlReportPaths>
             ${project.build.directory}/site/jacoco/jacoco.xml
