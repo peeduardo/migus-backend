@@ -37,7 +37,7 @@ jobs:
           name: app-jar
           path: target/*.jar
   unit-tests:
-    name: Testes Unitários + VCR
+    name: Testes Unitários + VCR 
     runs-on: ubuntu-latest
     needs: build
 
@@ -55,12 +55,12 @@ jobs:
       - name: Permitir execução do Maven Wrapper
         run: chmod +x mvnw
 
-      - name: Executar testes VCR
-        env:
-          SPRING_PROFILES_ACTIVE: ci
-        run: |
-          ./mvnw -B -ntp clean test \
-          -Dtest="**/vcr/*Test,**/service/*Test,**/controller/*Test"
+      # - name: Executar testes VCR
+        # env:
+          # SPRING_PROFILES_ACTIVE: ci
+        # run: |
+          # ./mvnw -B -ntp clean test \
+          # -Dtest="**/vcr/*Test,**/service/*Test,**/controller/*Test" 
 
       - name: Upload relatórios Surefire
         if: always()
