@@ -1,60 +1,43 @@
-# Migus backend — testes C05
+# Migus backend — testes unitários C05
 
-## Requisitos e configuração
+## Executar
 
-- JDK 21 e acesso à internet para baixar Maven e dependências no primeiro uso.
-- Conexão MongoDB de testes na nuvem (Atlas previsto pelo grupo).
-- Docker e Testcontainers não são utilizados nesta versão.
-
-Quando a conexão estiver disponível, configure `MONGODB_TEST_URI` no ambiente do
-terminal ou da IDE que executará os testes. Receba a URI por um meio privado;
-não a coloque no código, neste README ou no Git. O usuário do banco deve ter
-permissão de leitura e escrita somente em `migus_testes`. No Atlas, será necessário
-liberar o acesso de rede da máquina que executa os testes.
-
-Os dois testes ativam o profile `test`, com configuração em
-`src/test/resources/application-test.properties`. A propriedade do Spring Boot 4.1.1
-é `spring.mongodb.uri`. A classe verifica a variável e dá um erro claro se estiver
-ausente ou vazia, sem ignorar testes e sem usar localhost ou a conexão de desenvolvimento.
-A configuração dinâmica garante que a URI venha da variável exclusiva de testes.
-
-## Execução
-
-Na raiz do projeto, com a variável configurada, execute no PowerShell:
+Requisito: JDK 21. No primeiro uso, é necessário acesso à internet para baixar
+Maven e dependências. Na raiz do projeto, execute no PowerShell:
 
 ```powershell
-.\mvnw.cmd test
+.\mvnw.cmd clean test
 ```
 
-Para apenas compilar, sem executar testes nem conectar ao banco:
+No Linux/macOS, use `./mvnw clean test`.
 
-```powershell
-.\mvnw.cmd test-compile
-```
+Os testes usam JUnit e Mockito fornecidos pelos starters existentes. Não iniciam
+Spring, não acessam MongoDB ou Atlas, não usam Docker ou Testcontainers e não
+precisam de variáveis de conexão. A configuração MongoDB da aplicação continua
+sendo necessária somente para executar a aplicação real.
 
-A execução desta versão está pendente da conexão que será disponibilizada pelo Leo.
-O sucesso anterior com Testcontainers não valida esta adaptação.
+## O que é testado
 
-## Como funciona e padrão
+A classe `MigusApplicationTests` testa a rotina `testarMongoDB` já implementada:
 
-JUnit Jupiter, Spring Boot Test e Mockito continuam fornecidos pelos starters.
-O `MongoClient` é fornecido pelo Spring, sem simular o banco com Mockito.
-`contextLoads()` foi preservado e usa o mesmo profile de testes.
+- Quando o e-mail não existe, verifica que o repository recebe a chamada para
+  salvar e que o usuário enviado tem o nome e o e-mail esperados.
+- Quando o e-mail já existe, verifica que o repository não recebe a chamada para salvar.
 
-O teste de integração segue três etapas:
+Nos dois casos, também verifica a consulta de existência e a contagem de usuários.
+O repository é um mock: suas respostas são combinadas no teste e nenhum banco é
+consultado. `ArgumentCaptor` guarda o usuário passado para `save`, permitindo
+conferir seus dados. Não existe regra de erro adicional no código para testar.
 
-1. Preparação: seleciona `migus_testes`, coleção `c05_documentos`, e cria dados
-   fictícios com um novo identificador.
-2. Execução: insere o documento e busca pelo identificador.
-3. Verificação: confirma que encontrou o documento e confere identificador, nome e idade.
+## Padrão
 
-Um bloco `finally` tenta remover somente o documento criado pela execução, mesmo
-se uma verificação falhar. Não apaga bancos ou coleções. Se a conexão cair ou faltar
-permissão, a limpeza também poderá falhar e o erro será apresentado.
+- Testes em `src/test/java`, seguindo o pacote da classe testada.
+- Classes terminadas em `Test` ou `Tests` e métodos com nomes claros.
+- Separar preparação, execução e verificação.
+- Usar Mockito somente para dependências externas, como o repository.
+- Não usar `@SpringBootTest` nos testes unitários.
 
-Mantenha os testes em `src/test/java`, nos pacotes correspondentes à aplicação.
-Use classes terminadas em `Test` ou `Tests`, métodos com nomes claros, dados
-fictícios e testes independentes da ordem de execução.
-
-`test` executa os testes; `verify` também aplica as regras existentes de cobertura
-JaCoCo. Workflow, JaCoCo e Sonar não foram alterados nesta adaptação.
+O antigo teste de integração e seu profile de banco foram removidos.
+`clean test` executa a suíte sem reutilizar classes ou recursos de testes antigos.
+`verify` também aplica as regras de cobertura existentes. Workflow, JaCoCo e Sonar
+não foram alterados pela adaptação para testes unitários.
