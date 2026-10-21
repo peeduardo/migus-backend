@@ -97,6 +97,12 @@ jobs:
       - name: Rodar verify (unitários + ITs + JaCoCo)
         run: ./mvnw -B -ntp verify -Djacoco.check.skip=true
 
+      - name: Executar testes e gerar cobertura
+        run: ./mvnw -B -ntp clean verify
+
+      - name: Conferir relatório de cobertura
+        run: test -s target/site/jacoco/jacoco.xml
+
       - name: Analisar com SonarCloud
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
