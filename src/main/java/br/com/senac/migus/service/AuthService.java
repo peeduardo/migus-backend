@@ -40,7 +40,7 @@ public class AuthService {
         Usuarios usuario = new Usuarios(
                 request.nome().trim(), email, passwordEncoder.encode(request.senha()),
                 request.cpf(), request.telefone(), request.dataNascimento(),
-                "interessado", true, LocalDate.now(), LocalDate.now());
+                "VOLUNTARIO", true, LocalDate.now(), LocalDate.now());
         return UsuarioResponseDTO.from(usuariosRepository.save(usuario));
     }
 
