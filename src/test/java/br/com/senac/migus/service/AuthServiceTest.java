@@ -60,7 +60,7 @@ class AuthServiceTest {
 
         assertEquals("Ana Silva", resposta.nome());
         assertEquals("ana@exemplo.com", resposta.email());
-        assertEquals("VOLUNTARIO", resposta.tipoUsuario());
+        assertEquals("interessado", resposta.tipoUsuario());
         ArgumentCaptor<Usuarios> usuarioSalvo = ArgumentCaptor.forClass(Usuarios.class);
         verify(usuariosRepository).save(usuarioSalvo.capture());
         assertTrue(usuarioSalvo.getValue().getSenhaHash().startsWith("$2"));
@@ -171,7 +171,7 @@ class AuthServiceTest {
     private Usuarios usuario(String senhaHash, Boolean ativo) {
         Usuarios usuario = new Usuarios("Ana Silva", "ana@exemplo.com", senhaHash,
                 "12345678900", "11999999999", LocalDate.of(2000, 5, 20),
-                "VOLUNTARIO", ativo, LocalDate.now(), LocalDate.now());
+                "interessado", ativo, LocalDate.now(), LocalDate.now());
         ReflectionTestUtils.setField(usuario, "id", "usuario-id");
         return usuario;
     }
