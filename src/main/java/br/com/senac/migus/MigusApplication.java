@@ -29,7 +29,7 @@ public class MigusApplication {
 					"12345678900",
 					"11999999999",
 					LocalDate.of(2000, 5, 10),
-					"VOLUNTARIO",
+					"interessado",
 					true,
 					LocalDate.now(),
 					null
