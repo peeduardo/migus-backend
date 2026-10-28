@@ -2,6 +2,7 @@ package br.com.senac.migus.model;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import org.springframework.data.mongodb.core.mapping.Field;
 
@@ -77,6 +78,7 @@ public class Usuarios {
         this.email = email;
     }
 
+    @JsonIgnore
     public String getSenhaHash() {
         return senhaHash;
     }
