@@ -3,6 +3,7 @@ package br.com.senac.migus.service;
 import br.com.senac.migus.dto.AuthResponseDTO;
 import br.com.senac.migus.dto.CadastroRequestDTO;
 import br.com.senac.migus.dto.LoginRequestDTO;
+import br.com.senac.migus.dto.UsuarioDTO;
 import br.com.senac.migus.dto.UsuarioResponseDTO;
 import br.com.senac.migus.exception.AuthException;
 import br.com.senac.migus.model.Usuarios;
@@ -41,7 +42,8 @@ public class AuthService {
                 request.nome().trim(), email, passwordEncoder.encode(request.senha()),
                 request.cpf(), request.telefone(), request.dataNascimento(),
                 "interessado", true, LocalDate.now(), LocalDate.now());
-        return UsuarioResponseDTO.from(usuariosRepository.save(usuario));
+        Usuarios salvo = usuariosRepository.save(usuario);
+        return new UsuarioResponseDTO("Cadastro realizado com sucesso!", UsuarioDTO.fromEntity(salvo));
     }
 
     public AuthResponseDTO autenticar(LoginRequestDTO request) {
@@ -57,7 +59,7 @@ public class AuthService {
 
         String token = jwtService.generateToken(usuario.getId(), usuario.getEmail());
         return new AuthResponseDTO(token, "Bearer", jwtService.getExpirationMs(),
-                UsuarioResponseDTO.from(usuario));
+                UsuarioDTO.fromEntity(usuario));
     }
 
     private String normalizarEmail(String email) {

@@ -58,9 +58,10 @@ class AuthServiceTest {
 
         var resposta = authService.cadastrar(request);
 
-        assertEquals("Ana Silva", resposta.nome());
-        assertEquals("ana@exemplo.com", resposta.email());
-        assertEquals("interessado", resposta.tipoUsuario());
+        assertEquals("Cadastro realizado com sucesso!", resposta.mensagem());
+        assertEquals("Ana Silva", resposta.usuario().nome());
+        assertEquals("ana@exemplo.com", resposta.usuario().email());
+        assertEquals("interessado", resposta.usuario().tipoUsuario());
         ArgumentCaptor<Usuarios> usuarioSalvo = ArgumentCaptor.forClass(Usuarios.class);
         verify(usuariosRepository).save(usuarioSalvo.capture());
         assertTrue(usuarioSalvo.getValue().getSenhaHash().startsWith("$2"));
