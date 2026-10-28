@@ -13,6 +13,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -21,6 +23,7 @@ import java.time.LocalDate;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -172,5 +175,23 @@ class UsuariosControllerTest {
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.error").value("Bad Request"))
                 .andExpect(jsonPath("$.message").value("O e-mail informado já está em uso por outro usuário"));
+    }
+    @Test
+    void getMeuPerfil_deveRetornar200ComDadosDoUsuario() throws Exception {
+        UsuarioDTO dto = new UsuarioDTO("user-1", "João", "joao@email.com",
+                "123.456.789-00", "11999999999", LocalDate.of(1990, 1, 1),
+                "voluntario", true, LocalDate.now(), LocalDate.now());
+
+        when(usuariosService.getMeuPerfil("user-1")).thenReturn(dto);
+
+        var auth = new UsernamePasswordAuthenticationToken(
+                "user-1", null, AuthorityUtils.NO_AUTHORITIES);
+
+        mockMvc.perform(get("/api/usuarios/me").principal(auth))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("user-1"))
+                .andExpect(jsonPath("$.email").value("joao@email.com"))
+                .andExpect(jsonPath("$.senhaHash").doesNotExist())
+                .andExpect(jsonPath("$.senha").doesNotExist());
     }
 }

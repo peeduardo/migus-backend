@@ -1,5 +1,6 @@
 package br.com.senac.migus.service;
 
+import br.com.senac.migus.dto.UsuarioDTO;
 import br.com.senac.migus.dto.UsuarioResponseDTO;
 import br.com.senac.migus.dto.UsuarioUpdateRequestDTO;
 import br.com.senac.migus.exception.ResourceNotFoundException;
@@ -149,5 +150,37 @@ class UsuariosServiceTest {
                 .hasMessage("O e-mail informado já está em uso por outro usuário");
 
         verify(usuariosRepository, never()).save(any());
+    }
+
+    @Test
+    void getMeuPerfil_deveRetornarDadosDoUsuario() {
+        when(usuariosRepository.findById("user-123")).thenReturn(Optional.of(usuarioExistente));
+
+        UsuarioDTO dto = usuariosService.getMeuPerfil("user-123");
+
+        assertThat(dto.id()).isEqualTo("user-123");
+        assertThat(dto.nome()).isEqualTo("João Silva");
+        assertThat(dto.email()).isEqualTo("joao@email.com");
+    }
+
+    @Test
+    void getMeuPerfil_deveLancarExcecaoSeNaoEncontrado() {
+        when(usuariosRepository.findById("inexistente")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> usuariosService.getMeuPerfil("inexistente"))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Usuário não encontrado");
+    }
+
+    @Test
+    void getMeuPerfil_naoDeveExporSenhaHash() {
+        when(usuariosRepository.findById("user-123")).thenReturn(Optional.of(usuarioExistente));
+
+        UsuarioDTO dto = usuariosService.getMeuPerfil("user-123");
+
+        boolean temCampoSenha = java.util.Arrays.stream(dto.getClass().getRecordComponents())
+                .anyMatch(c -> c.getName().toLowerCase().contains("senha"));
+
+        assertThat(temCampoSenha).isFalse();
     }
 }

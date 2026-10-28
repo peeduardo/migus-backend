@@ -1,5 +1,6 @@
 package br.com.senac.migus.service;
 
+import br.com.senac.migus.dto.UsuarioDTO;
 import br.com.senac.migus.dto.UsuarioResponseDTO;
 import br.com.senac.migus.dto.UsuarioUpdateRequestDTO;
 import br.com.senac.migus.exception.ResourceNotFoundException;
@@ -16,6 +17,12 @@ public class UsuariosService {
 
     public UsuariosService(UsuariosRepository usuariosRepository) {
         this.usuariosRepository = usuariosRepository;
+    }
+
+    public UsuarioDTO getMeuPerfil(String userId) {
+        Usuarios usuario = usuariosRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+        return UsuarioDTO.fromEntity(usuario);
     }
 
     public UsuarioResponseDTO atualizar(String id, UsuarioUpdateRequestDTO dto) {
