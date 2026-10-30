@@ -5,6 +5,7 @@ import br.com.senac.migus.dto.UsuarioResponseDTO;
 import br.com.senac.migus.dto.UsuarioUpdateRequestDTO;
 import br.com.senac.migus.service.UsuariosService;
 import jakarta.validation.Valid;
+import java.security.Principal;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,9 +34,9 @@ public class UsuariosController {
 
     @PutMapping("/{id}")
     public ResponseEntity<UsuarioResponseDTO> atualizar(
-            @PathVariable String id,
+            @PathVariable String id, Principal principal,
             @Valid @RequestBody UsuarioUpdateRequestDTO dto) {
-        UsuarioResponseDTO response = usuariosService.atualizar(id, dto);
+        UsuarioResponseDTO response = usuariosService.atualizar(id, dto, principal == null ? null : principal.getName());
         return ResponseEntity.ok(response);
     }
 }

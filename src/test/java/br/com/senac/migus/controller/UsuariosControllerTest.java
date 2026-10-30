@@ -54,9 +54,7 @@ class UsuariosControllerTest {
                     "nome": "Maria Souza",
                     "email": "maria@email.com",
                     "telefone": "11988887777",
-                    "dataNascimento": "1990-05-20",
-                    "tipoUsuario": "VOLUNTARIO",
-                    "ativo": true
+                    "dataNascimento": "1990-05-20"
                 }
                 """;
 
@@ -78,10 +76,10 @@ class UsuariosControllerTest {
                 usuarioDTO
         );
 
-        when(usuariosService.atualizar(eq("user-1"), any(UsuarioUpdateRequestDTO.class)))
+        when(usuariosService.atualizar(eq("user-1"), any(UsuarioUpdateRequestDTO.class), eq("user-1")))
                 .thenReturn(responseDTO);
 
-        mockMvc.perform(put("/api/usuarios/user-1")
+        mockMvc.perform(put("/api/usuarios/user-1").principal(() -> "user-1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestJson))
                 .andExpect(status().isOk())
@@ -104,10 +102,10 @@ class UsuariosControllerTest {
                 }
                 """;
 
-        when(usuariosService.atualizar(eq("id-inexistente"), any(UsuarioUpdateRequestDTO.class)))
+        when(usuariosService.atualizar(eq("id-inexistente"), any(UsuarioUpdateRequestDTO.class), eq("id-inexistente")))
                 .thenThrow(new ResourceNotFoundException("Usuário não encontrado com o ID: id-inexistente"));
 
-        mockMvc.perform(put("/api/usuarios/id-inexistente")
+        mockMvc.perform(put("/api/usuarios/id-inexistente").principal(() -> "id-inexistente")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestJson))
                 .andExpect(status().isNotFound())
@@ -127,7 +125,7 @@ class UsuariosControllerTest {
                 }
                 """;
 
-        mockMvc.perform(put("/api/usuarios/user-1")
+        mockMvc.perform(put("/api/usuarios/user-1").principal(() -> "user-1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestJson))
                 .andExpect(status().isBadRequest())
@@ -146,7 +144,7 @@ class UsuariosControllerTest {
                 }
                 """;
 
-        mockMvc.perform(put("/api/usuarios/user-1")
+        mockMvc.perform(put("/api/usuarios/user-1").principal(() -> "user-1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestJson))
                 .andExpect(status().isBadRequest())
@@ -165,10 +163,10 @@ class UsuariosControllerTest {
                 }
                 """;
 
-        when(usuariosService.atualizar(eq("user-1"), any(UsuarioUpdateRequestDTO.class)))
+        when(usuariosService.atualizar(eq("user-1"), any(UsuarioUpdateRequestDTO.class), eq("user-1")))
                 .thenThrow(new IllegalArgumentException("O e-mail informado já está em uso por outro usuário"));
 
-        mockMvc.perform(put("/api/usuarios/user-1")
+        mockMvc.perform(put("/api/usuarios/user-1").principal(() -> "user-1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestJson))
                 .andExpect(status().isBadRequest())
