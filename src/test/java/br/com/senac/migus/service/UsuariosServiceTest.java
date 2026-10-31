@@ -58,15 +58,15 @@ class UsuariosServiceTest {
                 "joao.novo@email.com",
                 "11999998888",
                 LocalDate.of(1995, 3, 20),
-                "ADMIN",
-                true
+                null,
+                null
         );
 
         when(usuariosRepository.findById("user-123")).thenReturn(Optional.of(usuarioExistente));
         when(usuariosRepository.findByEmail("joao.novo@email.com")).thenReturn(Optional.empty());
         when(usuariosRepository.save(any(Usuarios.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        UsuarioResponseDTO response = usuariosService.atualizar("user-123", dto);
+        UsuarioResponseDTO response = usuariosService.atualizar("user-123", dto, "user-123");
 
         assertThat(response).isNotNull();
         assertThat(response.mensagem()).isEqualTo("Usuário atualizado com sucesso!");
@@ -75,7 +75,7 @@ class UsuariosServiceTest {
         assertThat(response.usuario().email()).isEqualTo("joao.novo@email.com");
         assertThat(response.usuario().telefone()).isEqualTo("11999998888");
         assertThat(response.usuario().dataNascimento()).isEqualTo(LocalDate.of(1995, 3, 20));
-        assertThat(response.usuario().tipoUsuario()).isEqualTo("ADMIN");
+        assertThat(response.usuario().tipoUsuario()).isEqualTo("VOLUNTARIO");
         assertThat(response.usuario().ativo()).isTrue();
         assertThat(response.usuario().dataAtualizacao()).isEqualTo(LocalDate.now());
 
@@ -96,7 +96,7 @@ class UsuariosServiceTest {
         when(usuariosRepository.findById("user-123")).thenReturn(Optional.of(usuarioExistente));
         when(usuariosRepository.save(any(Usuarios.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        UsuarioResponseDTO response = usuariosService.atualizar("user-123", dto);
+        UsuarioResponseDTO response = usuariosService.atualizar("user-123", dto, "user-123");
 
         assertThat(response.mensagem()).isEqualTo("Usuário atualizado com sucesso!");
         assertThat(response.usuario().nome()).isEqualTo("João Alterado");
@@ -120,7 +120,7 @@ class UsuariosServiceTest {
 
         when(usuariosRepository.findById("id-invalido")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> usuariosService.atualizar("id-invalido", dto))
+        assertThatThrownBy(() -> usuariosService.atualizar("id-invalido", dto, "id-invalido"))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("Usuário não encontrado com o ID: id-invalido");
 
@@ -145,7 +145,7 @@ class UsuariosServiceTest {
         when(usuariosRepository.findById("user-123")).thenReturn(Optional.of(usuarioExistente));
         when(usuariosRepository.findByEmail("outro@email.com")).thenReturn(Optional.of(outroUsuario));
 
-        assertThatThrownBy(() -> usuariosService.atualizar("user-123", dto))
+        assertThatThrownBy(() -> usuariosService.atualizar("user-123", dto, "user-123"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("O e-mail informado já está em uso por outro usuário");
 
