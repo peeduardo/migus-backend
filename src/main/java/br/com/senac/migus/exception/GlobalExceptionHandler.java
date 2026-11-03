@@ -3,6 +3,7 @@ package br.com.senac.migus.exception;
 import br.com.senac.migus.dto.ErrorResponseDTO;
 import java.time.LocalDateTime;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -10,6 +11,16 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponseDTO> handleInvalidBody(HttpMessageNotReadableException ex) {
+        return build(HttpStatus.BAD_REQUEST, "Corpo da requisição inválido");
+    }
+
+    @ExceptionHandler(AuthException.class)
+    public ResponseEntity<ErrorResponseDTO> handleAuth(AuthException ex) {
+        return build(ex.getStatus(), ex.getMessage());
+    }
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponseDTO> handleNotFound(ResourceNotFoundException ex) {
