@@ -1,12 +1,15 @@
 package br.com.senac.migus.service;
 
+import br.com.senac.migus.exception.AuthException;
 import br.com.senac.migus.dto.UsuarioDTO;
+
 import br.com.senac.migus.dto.UsuarioResponseDTO;
 import br.com.senac.migus.dto.UsuarioUpdateRequestDTO;
 import br.com.senac.migus.exception.ResourceNotFoundException;
 import br.com.senac.migus.model.Usuarios;
 import br.com.senac.migus.repository.UsuariosRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
 
 import java.time.LocalDate;
 
@@ -25,7 +28,16 @@ public class UsuariosService {
         return UsuarioDTO.fromEntity(usuario);
     }
 
-    public UsuarioResponseDTO atualizar(String id, UsuarioUpdateRequestDTO dto) {
+    public UsuarioResponseDTO atualizar(String id, UsuarioUpdateRequestDTO dto, String usuarioAutenticadoId) {
+        if (usuarioAutenticadoId == null) {
+            throw new AuthException("Autenticação necessária", HttpStatus.UNAUTHORIZED);
+        }
+        if (!usuarioAutenticadoId.equals(id)) {
+            throw new AuthException("Você só pode atualizar sua própria conta", HttpStatus.FORBIDDEN);
+        }
+        if (dto.tipoUsuario() != null || dto.ativo() != null) {
+            throw new AuthException("Não é permitido alterar perfil ou status nesta operação", HttpStatus.FORBIDDEN);
+        }
         Usuarios usuario = usuariosRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o ID: " + id));
 
@@ -44,12 +56,6 @@ public class UsuariosService {
         }
         if (dto.dataNascimento() != null) {
             usuario.setDataNascimento(dto.dataNascimento());
-        }
-        if (dto.tipoUsuario() != null) {
-            usuario.setTipoUsuario(dto.tipoUsuario());
-        }
-        if (dto.ativo() != null) {
-            usuario.setAtivo(dto.ativo());
         }
         usuario.setDataAtualizacao(LocalDate.now());
 
