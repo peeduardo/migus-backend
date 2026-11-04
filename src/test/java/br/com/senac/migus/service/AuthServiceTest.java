@@ -70,6 +70,36 @@ class AuthServiceTest {
     }
 
     @Test
+    void deveCadastrarComoResponsavelQuandoEmailForDoDominioMigus() {
+        var request = new CadastroRequestDTO("Bia", "Bia@Migus.com.br", "senha-segura",
+                "12345678900", null, null);
+        when(usuariosRepository.existsByEmail("bia@migus.com.br")).thenReturn(false);
+        when(usuariosRepository.existsByCpf("12345678900")).thenReturn(false);
+        when(passwordEncoder.encode("senha-segura")).thenReturn("hash");
+        when(usuariosRepository.save(any(Usuarios.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        var resposta = authService.cadastrar(request);
+
+        assertEquals("responsavel", resposta.usuario().tipoUsuario());
+    }
+
+    @Test
+    void naoDeveTratarDominioParecidoComoMigus() {
+        var request = new CadastroRequestDTO("Bia", "bia@nomigus.com", "senha-segura",
+                "12345678900", null, null);
+        when(usuariosRepository.existsByEmail("bia@nomigus.com")).thenReturn(false);
+        when(usuariosRepository.existsByCpf("12345678900")).thenReturn(false);
+        when(passwordEncoder.encode("senha-segura")).thenReturn("hash");
+        when(usuariosRepository.save(any(Usuarios.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        var resposta = authService.cadastrar(request);
+
+        assertEquals("interessado", resposta.usuario().tipoUsuario());
+    }
+
+    @Test
     void naoDeveCadastrarEmailDuplicado() {
         when(usuariosRepository.existsByEmail("ana@exemplo.com")).thenReturn(true);
 
@@ -98,7 +128,7 @@ class AuthServiceTest {
         Usuarios usuario = usuario("hash-bcrypt", true);
         when(usuariosRepository.findByEmail("ana@exemplo.com")).thenReturn(Optional.of(usuario));
         when(passwordEncoder.matches("senha-segura", "hash-bcrypt")).thenReturn(true);
-        when(jwtService.generateToken("usuario-id", "ana@exemplo.com")).thenReturn("jwt-valido");
+        when(jwtService.generateToken("usuario-id", "ana@exemplo.com", "interessado")).thenReturn("jwt-valido");
         when(jwtService.getExpirationMs()).thenReturn(3_600_000L);
 
         var resposta = authService.autenticar(new LoginRequestDTO(" Ana@Exemplo.com ", "senha-segura"));
@@ -107,7 +137,7 @@ class AuthServiceTest {
         assertEquals("Bearer", resposta.tipo());
         assertEquals(3_600_000L, resposta.expiraEm());
         assertEquals("ana@exemplo.com", resposta.usuario().email());
-        verify(jwtService).generateToken("usuario-id", "ana@exemplo.com");
+        verify(jwtService).generateToken("usuario-id", "ana@exemplo.com", "interessado");
     }
 
     @Test
@@ -120,7 +150,7 @@ class AuthServiceTest {
         assertEquals(HttpStatus.UNAUTHORIZED, exception.getStatus());
         assertEquals("Usuário não encontrado", exception.getMessage());
         verify(passwordEncoder, never()).matches(any(), any());
-        verify(jwtService, never()).generateToken(any(), any());
+        verify(jwtService, never()).generateToken(any(), any(), any());
     }
 
     @Test
@@ -134,7 +164,7 @@ class AuthServiceTest {
 
         assertEquals(HttpStatus.UNAUTHORIZED, exception.getStatus());
         assertEquals("Senha inválida", exception.getMessage());
-        verify(jwtService, never()).generateToken(any(), any());
+        verify(jwtService, never()).generateToken(any(), any(), any());
     }
 
     @Test
@@ -148,7 +178,7 @@ class AuthServiceTest {
 
         assertEquals(HttpStatus.FORBIDDEN, exception.getStatus());
         assertTrue(exception.getMessage().contains("inativo"));
-        verify(jwtService, never()).generateToken(any(), any());
+        verify(jwtService, never()).generateToken(any(), any(), any());
     }
 
     @Test
@@ -161,7 +191,7 @@ class AuthServiceTest {
                 () -> authService.autenticar(new LoginRequestDTO("ana@exemplo.com", "senha-segura")));
 
         assertEquals(HttpStatus.FORBIDDEN, exception.getStatus());
-        verify(jwtService, never()).generateToken(any(), any());
+        verify(jwtService, never()).generateToken(any(), any(), any());
     }
 
     private CadastroRequestDTO cadastroRequest() {

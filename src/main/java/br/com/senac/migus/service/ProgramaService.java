@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.http.HttpStatus;
 
 import java.util.Date;
+import java.util.List;
 
 @Service
 public class ProgramaService {
@@ -39,5 +40,9 @@ public class ProgramaService {
                 pedido.categoria(), pedido.diasDisponiveis(), pedido.horarioInicio(), pedido.horarioFim(),
                 pedido.ativo(), responsavel.getId(), new Date(), null);
         return programas.save(programa);
+    }
+
+    public List<Programa> listarAtivos() {
+        return programas.findByAtivoTrue();
     }
 }
