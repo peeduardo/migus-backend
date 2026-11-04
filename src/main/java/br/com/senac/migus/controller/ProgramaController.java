@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/programas")
@@ -24,5 +25,10 @@ public class ProgramaController {
                                              Principal principal) {
         var programa = programas.cadastrar(pedido, principal == null ? null : principal.getName());
         return ResponseEntity.status(HttpStatus.CREATED).body(programa);
+    }
+
+    @GetMapping("/ativos")
+    public ResponseEntity<List<Programa>> listarAtivos() {
+        return ResponseEntity.ok(programas.listarAtivos());
     }
 }
