@@ -45,4 +45,64 @@ public class ProgramaService {
     public List<Programa> listarAtivos() {
         return programas.findByAtivoTrue();
     }
+
+    public Programa alterarDisponibilidade(String programaId, Boolean ativo, String usuarioId) {
+
+        if (usuarioId == null) {
+            throw new AuthException("Autenticação necessária", HttpStatus.UNAUTHORIZED);
+        }
+
+        if (ativo == null) {
+            throw new AuthException("O estado de disponibilidade é obrigatório", HttpStatus.BAD_REQUEST);
+        }
+
+        var responsavel = usuarios.findById(usuarioId)
+                .orElseThrow(() -> new AuthException("Usuário não encontrado", HttpStatus.FORBIDDEN));
+
+        if (!Boolean.TRUE.equals(responsavel.getAtivo())
+                || !"RESPONSAVEL".equals(responsavel.getTipoUsuario())) {
+            throw new AuthException("Somente um responsável ativo pode alterar programas", HttpStatus.FORBIDDEN);
+        }
+
+        var programa = programas.findByIdAndResponsavelId(programaId, responsavel.getId())
+                .orElseThrow(
+                        () -> new AuthException("Programa não encontrado ou não autorizado", HttpStatus.NOT_FOUND));
+
+        var programaAtualizado = new Programa(
+                programa.getId(),
+                programa.getNome(),
+                programa.getDescricao(),
+                programa.getCategoria(),
+                programa.getDiasDisponiveis(),
+                programa.getHorarioInicio(),
+                programa.getHorarioFim(),
+                ativo,
+                programa.getResponsavelId(),
+                programa.getDataCadastro(),
+                new Date());
+
+        return programas.save(programaAtualizado);
+    }
+
+    public List<Programa> listarMeusProgramas(String usuarioId) {
+        if (usuarioId == null) {
+            throw new AuthException(
+                    "Autenticação necessária",
+                    HttpStatus.UNAUTHORIZED);
+        }
+
+        var responsavel = usuarios.findById(usuarioId)
+                .orElseThrow(() -> new AuthException(
+                        "Usuário não encontrado",
+                        HttpStatus.FORBIDDEN));
+
+        if (!Boolean.TRUE.equals(responsavel.getAtivo())
+                || !"RESPONSAVEL".equals(responsavel.getTipoUsuario())) {
+            throw new AuthException(
+                    "Somente um responsável ativo pode consultar seus programas",
+                    HttpStatus.FORBIDDEN);
+        }
+
+        return programas.findByResponsavelId(responsavel.getId());
+    }
 }
