@@ -67,7 +67,7 @@ class ProgramaControllerTest {
         usuario.setAtivo(true);
         when(usuarios.findById(USUARIO_ID)).thenReturn(Optional.of(usuario));
         when(programas.save(any(Programa.class))).thenAnswer(call -> call.getArgument(0));
-        token = context.getBean(JwtService.class).generateToken(USUARIO_ID, "teste@exemplo.com");
+        token = context.getBean(JwtService.class).generateToken(USUARIO_ID, "teste@exemplo.com", "interessado");
         mvc = MockMvcBuilders.webAppContextSetup(context)
                 .addFilters(context.getBean("springSecurityFilterChain", Filter.class)).build();
     }
@@ -82,6 +82,27 @@ class ProgramaControllerTest {
                 .andExpect(jsonPath("$.id").isNotEmpty())
                 .andExpect(jsonPath("$.dataCadastro").isNotEmpty());
         verify(programas).save(any(Programa.class));
+    }
+
+    @Test
+    void deveListarProgramasAtivosComToken() throws Exception {
+        var programa = new Programa("507f1f77bcf86cd799439022", "Apoio", "Apoio à comunidade",
+                java.util.List.of("Educação"), java.util.List.of("segunda"), "09:00", "12:00", true,
+                USUARIO_ID, new java.util.Date(), null);
+        when(programas.findByAtivoTrue()).thenReturn(java.util.List.of(programa));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/programas/ativos")
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value("507f1f77bcf86cd799439022"))
+                .andExpect(jsonPath("$[0].ativo").value(true));
+    }
+
+    @Test
+    void deveBloquearListagemDeAtivosSemToken() throws Exception {
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/programas/ativos"))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(programas);
     }
 
     @Test

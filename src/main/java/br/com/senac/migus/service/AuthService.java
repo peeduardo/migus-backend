@@ -41,7 +41,7 @@ public class AuthService {
         Usuarios usuario = new Usuarios(
                 request.nome().trim(), email, passwordEncoder.encode(request.senha()),
                 request.cpf(), request.telefone(), request.dataNascimento(),
-                "interessado", true, LocalDate.now(), LocalDate.now());
+                definirTipoUsuario(email), true, LocalDate.now(), LocalDate.now());
         Usuarios salvo = usuariosRepository.save(usuario);
         return new UsuarioResponseDTO("Cadastro realizado com sucesso!", UsuarioDTO.fromEntity(salvo));
     }
@@ -57,9 +57,15 @@ public class AuthService {
             throw new AuthException("Usuário inativo. Entre em contato com o suporte.", HttpStatus.FORBIDDEN);
         }
 
-        String token = jwtService.generateToken(usuario.getId(), usuario.getEmail());
+        String token = jwtService.generateToken(usuario.getId(), usuario.getEmail(), usuario.getTipoUsuario());
         return new AuthResponseDTO(token, "Bearer", jwtService.getExpirationMs(),
                 UsuarioDTO.fromEntity(usuario));
+    }
+
+    private String definirTipoUsuario(String email) {
+        String dominio = email.substring(email.lastIndexOf('@') + 1);
+        boolean emailMigus = dominio.equals("migus") || dominio.startsWith("migus.");
+        return emailMigus ? "responsavel" : "interessado";
     }
 
     private String normalizarEmail(String email) {
