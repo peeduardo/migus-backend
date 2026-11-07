@@ -58,6 +58,11 @@ public class Inscricao {
         return dataAtualizacao;
     }
 
+    public void transferir(Date data) {
+        this.status = "TRANSFERIDA";
+        this.dataAtualizacao = data;
+    }
+
     public void aprovar(Date data) {
         this.status = "APROVADA";
         this.dataAprovacao = data;
