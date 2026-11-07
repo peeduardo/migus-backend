@@ -289,4 +289,76 @@ class InscricaoServiceTest {
         assertEquals(HttpStatus.CONFLICT, erro.getStatus());
         verify(inscricoes, never()).save(any());
     }
+
+    // --- transferir branches ---
+
+    @Test
+    void deveBloquearTransferenciaDeInscricaoNaoAprovada() {
+        autenticarComoResponsavel("RESPONSAVEL", true);
+        var inscricao = new Inscricao(INSCRICAO_ID, USUARIO_ID, PROGRAMA_ID, "PENDENTE",
+                new Date(), null, null, null);
+        when(inscricoes.findById(INSCRICAO_ID)).thenReturn(Optional.of(inscricao));
+
+        assertEquals(HttpStatus.CONFLICT, assertThrows(AuthException.class,
+                () -> service.transferir(INSCRICAO_ID, "destino-id", RESPONSAVEL_ID)).getStatus());
+    }
+
+    @Test
+    void deveBloquearTransferenciaDeResponsavelDeOutroPrograma() {
+        autenticarComoResponsavel("RESPONSAVEL", true);
+        var inscricao = new Inscricao(INSCRICAO_ID, USUARIO_ID, PROGRAMA_ID, "APROVADA",
+                new Date(), new Date(), null, null);
+        when(inscricoes.findById(INSCRICAO_ID)).thenReturn(Optional.of(inscricao));
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.of(
+                new Programa(PROGRAMA_ID, "P", "D", null, null, "09:00", "18:00", true, "outro-resp", new Date(), null)));
+
+        assertEquals(HttpStatus.FORBIDDEN, assertThrows(AuthException.class,
+                () -> service.transferir(INSCRICAO_ID, "destino-id", RESPONSAVEL_ID)).getStatus());
+    }
+
+    @Test
+    void deveBloquearTransferenciaParaMesmoPrograma() {
+        autenticarComoResponsavel("RESPONSAVEL", true);
+        var inscricao = new Inscricao(INSCRICAO_ID, USUARIO_ID, PROGRAMA_ID, "APROVADA",
+                new Date(), new Date(), null, null);
+        when(inscricoes.findById(INSCRICAO_ID)).thenReturn(Optional.of(inscricao));
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.of(
+                new Programa(PROGRAMA_ID, "P", "D", null, null, "09:00", "18:00", true, RESPONSAVEL_ID, new Date(), null)));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.transferir(INSCRICAO_ID, PROGRAMA_ID, RESPONSAVEL_ID));
+    }
+
+    @Test
+    void deveBloquearTransferenciaParaProgramaInativo() {
+        autenticarComoResponsavel("RESPONSAVEL", true);
+        String DESTINO_ID = "507f1f77bcf86cd799439099";
+        var inscricao = new Inscricao(INSCRICAO_ID, USUARIO_ID, PROGRAMA_ID, "APROVADA",
+                new Date(), new Date(), null, null);
+        when(inscricoes.findById(INSCRICAO_ID)).thenReturn(Optional.of(inscricao));
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.of(
+                new Programa(PROGRAMA_ID, "P", "D", null, null, "09:00", "18:00", true, RESPONSAVEL_ID, new Date(), null)));
+        when(programas.findById(DESTINO_ID)).thenReturn(Optional.of(
+                new Programa(DESTINO_ID, "P2", "D2", null, null, "09:00", "18:00", false, "resp2", new Date(), null)));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.transferir(INSCRICAO_ID, DESTINO_ID, RESPONSAVEL_ID));
+    }
+
+    @Test
+    void deveBloquearTransferenciaSeVoluntarioJaInscritoNoDestino() {
+        autenticarComoResponsavel("RESPONSAVEL", true);
+        String DESTINO_ID = "507f1f77bcf86cd799439099";
+        var inscricao = new Inscricao(INSCRICAO_ID, USUARIO_ID, PROGRAMA_ID, "APROVADA",
+                new Date(), new Date(), null, null);
+        when(inscricoes.findById(INSCRICAO_ID)).thenReturn(Optional.of(inscricao));
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.of(
+                new Programa(PROGRAMA_ID, "P", "D", null, null, "09:00", "18:00", true, RESPONSAVEL_ID, new Date(), null)));
+        when(programas.findById(DESTINO_ID)).thenReturn(Optional.of(
+                new Programa(DESTINO_ID, "P2", "D2", null, null, "09:00", "18:00", true, "resp2", new Date(), null)));
+        when(inscricoes.existsByVoluntarioIdAndProgramaId(USUARIO_ID, DESTINO_ID)).thenReturn(true);
+
+        assertEquals(HttpStatus.CONFLICT, assertThrows(AuthException.class,
+                () -> service.transferir(INSCRICAO_ID, DESTINO_ID, RESPONSAVEL_ID)).getStatus());
+    }
 }
