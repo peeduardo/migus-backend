@@ -192,6 +192,34 @@ class ProgramaControllerTest {
         verify(programas, never()).save(any());
     }
 
+    @Test
+    void deveBuscarProgramaPorId() throws Exception {
+        var programa = new Programa("507f1f77bcf86cd799439022", "Apoio", "Apoio à comunidade",
+                java.util.List.of("Educação"), java.util.List.of("segunda"), "09:00", "12:00", true,
+                USUARIO_ID, new java.util.Date(), null);
+        when(programas.findById("507f1f77bcf86cd799439022")).thenReturn(Optional.of(programa));
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .get("/api/programas/507f1f77bcf86cd799439022")
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("507f1f77bcf86cd799439022"))
+                .andExpect(jsonPath("$.nome").value("Apoio"))
+                .andExpect(jsonPath("$.responsavelId").doesNotExist());
+    }
+
+    @Test
+    void deveBuscarProgramaPorIdInexistente() throws Exception {
+        when(programas.findById("id-invalido")).thenReturn(Optional.empty());
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .get("/api/programas/id-invalido")
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.message").value("Programa não encontrado com o ID: id-invalido"));
+    }
+
     @ParameterizedTest
     @CsvSource({"interessado,true", "VOLUNTARIO,true", "RESPONSAVEL,false"})
     void deveRetornar403ParaPerfilOuStatusSemPermissao(String perfil, boolean ativo) throws Exception {

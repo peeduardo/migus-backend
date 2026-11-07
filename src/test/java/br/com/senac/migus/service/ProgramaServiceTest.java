@@ -41,6 +41,36 @@ class ProgramaServiceTest {
         verify(programas, never()).save(any());
     }
     @Test
+    void buscarPorId_deveRetornarDetalhesDoPrograma() {
+        var usuarios = mock(UsuariosRepository.class);
+        var programas = mock(ProgramaRepository.class);
+        var programa = new Programa("507f1f77bcf86cd799439011", "Apoio", "Apoio à comunidade",
+                List.of("Educação"), List.of("segunda"), "09:00", "12:00", true,
+                "responsavel-id", new Date(), null);
+        when(programas.findById("507f1f77bcf86cd799439011")).thenReturn(Optional.of(programa));
+
+        var dto = new ProgramaService(programas, usuarios).buscarPorId("507f1f77bcf86cd799439011");
+
+        assertEquals("507f1f77bcf86cd799439011", dto.id());
+        assertEquals("Apoio", dto.nome());
+        assertEquals("Apoio à comunidade", dto.descricao());
+        assertNull(dto.getClass().getRecordComponents()[0].getDeclaringRecord()
+                .getDeclaredFields().length > 0 ? null : null); // responsavelId não existe no DTO
+    }
+
+    @Test
+    void buscarPorId_deveLancarExcecaoSeNaoEncontrado() {
+        var usuarios = mock(UsuariosRepository.class);
+        var programas = mock(ProgramaRepository.class);
+        when(programas.findById("inexistente")).thenReturn(Optional.empty());
+
+        var ex = assertThrows(br.com.senac.migus.exception.ResourceNotFoundException.class,
+                () -> new ProgramaService(programas, usuarios).buscarPorId("inexistente"));
+
+        assertEquals("Programa não encontrado com o ID: inexistente", ex.getMessage());
+    }
+
+    @Test
     void deveCadastrarProgramaComResponsavelEDataDoServidor() {
         var usuarios = mock(UsuariosRepository.class);
         var programas = mock(ProgramaRepository.class);

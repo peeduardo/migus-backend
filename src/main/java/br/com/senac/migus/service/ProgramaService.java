@@ -1,6 +1,8 @@
 package br.com.senac.migus.service;
 
+import br.com.senac.migus.dto.ProgramaDetalheDTO;
 import br.com.senac.migus.exception.AuthException;
+import br.com.senac.migus.exception.ResourceNotFoundException;
 
 import br.com.senac.migus.dto.ProgramaRequestDTO;
 import br.com.senac.migus.model.Programa;
@@ -40,6 +42,12 @@ public class ProgramaService {
                 pedido.categoria(), pedido.diasDisponiveis(), pedido.horarioInicio(), pedido.horarioFim(),
                 pedido.ativo(), responsavel.getId(), new Date(), null);
         return programas.save(programa);
+    }
+
+    public ProgramaDetalheDTO buscarPorId(String id) {
+        Programa programa = programas.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Programa não encontrado com o ID: " + id));
+        return ProgramaDetalheDTO.fromEntity(programa);
     }
 
     public List<Programa> listarAtivos() {

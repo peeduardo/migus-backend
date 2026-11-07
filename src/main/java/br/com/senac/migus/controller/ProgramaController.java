@@ -1,6 +1,7 @@
 package br.com.senac.migus.controller;
 
 import br.com.senac.migus.dto.DisponibilidadeRequestDTO;
+import br.com.senac.migus.dto.ProgramaDetalheDTO;
 import br.com.senac.migus.dto.ProgramaRequestDTO;
 import br.com.senac.migus.model.Programa;
 import br.com.senac.migus.service.ProgramaService;
@@ -26,6 +27,11 @@ public class ProgramaController {
             Principal principal) {
         var programa = programas.cadastrar(pedido, principal == null ? null : principal.getName());
         return ResponseEntity.status(HttpStatus.CREATED).body(programa);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<ProgramaDetalheDTO> buscarPorId(@PathVariable String id) {
+        return ResponseEntity.ok(programas.buscarPorId(id));
     }
 
     @GetMapping("/ativos")
