@@ -109,33 +109,72 @@ class InscricaoServiceTest {
         voluntario.setId(USUARIO_ID);
         voluntario.setNome("Ana");
         voluntario.setEmail("ana@exemplo.com");
-        var inscricao = new Inscricao("507f1f77bcf86cd799439044", USUARIO_ID, PROGRAMA_ID, "PENDENTE",
-                new Date(), null, null, null);
+        voluntario.setTelefone("11999999999");
+        var inscricao = new Inscricao("507f1f77bcf86cd799439044", USUARIO_ID, PROGRAMA_ID, "APROVADA",
+                new Date(), new Date(), null, null);
         when(programas.existsById(PROGRAMA_ID)).thenReturn(true);
-        when(inscricoes.findByProgramaId(PROGRAMA_ID)).thenReturn(java.util.List.of(inscricao));
+        when(inscricoes.findByProgramaIdAndStatus(PROGRAMA_ID, "APROVADA")).thenReturn(java.util.List.of(inscricao));
         when(usuarios.findAllById(java.util.List.of(USUARIO_ID))).thenReturn(java.util.List.of(voluntario));
 
-        var lista = service.listarInscritos(PROGRAMA_ID, "507f1f77bcf86cd799439033");
+        var lista = service.listarInscritos(PROGRAMA_ID, "APROVADA", "507f1f77bcf86cd799439033");
 
+        // Verifica que retornou apenas voluntários do programa selecionado
         assertEquals(1, lista.size());
+        assertEquals(USUARIO_ID, lista.get(0).usuarioId());
+        // Confirma que os dados correspondem aos registros do MongoDB
         assertEquals("Ana", lista.get(0).nome());
         assertEquals("ana@exemplo.com", lista.get(0).email());
-        assertEquals("PENDENTE", lista.get(0).status());
-        assertEquals(USUARIO_ID, lista.get(0).usuarioId());
+        assertEquals("11999999999", lista.get(0).telefone());
+        assertEquals("APROVADA", lista.get(0).status());
+        assertEquals("507f1f77bcf86cd799439044", lista.get(0).inscricaoId());
+    }
+
+    @Test
+    void deveRetornarListaVaziaQuandoNaoHaVoluntariosVinculados() {
+        autenticarComoResponsavel("responsavel", true);
+        when(programas.existsById(PROGRAMA_ID)).thenReturn(true);
+        when(inscricoes.findByProgramaId(PROGRAMA_ID)).thenReturn(java.util.List.of());
+
+        var lista = service.listarInscritos(PROGRAMA_ID, null, "507f1f77bcf86cd799439033");
+
+        assertEquals(0, lista.size());
+    }
+
+    @Test
+    void deveListarApenasInscritosDoProgramaSelecionado() {
+        autenticarComoResponsavel("responsavel", true);
+        var outroPrograma = "507f1f77bcf86cd799439099";
+        var voluntario = new Usuarios();
+        voluntario.setId(USUARIO_ID);
+        voluntario.setNome("Ana");
+        // inscrição no PROGRAMA_ID
+        var inscricaoProg1 = new Inscricao("507f1f77bcf86cd799439044", USUARIO_ID, PROGRAMA_ID, "APROVADA",
+                new Date(), new Date(), null, null);
+        when(programas.existsById(PROGRAMA_ID)).thenReturn(true);
+        when(inscricoes.findByProgramaIdAndStatus(PROGRAMA_ID, "APROVADA"))
+                .thenReturn(java.util.List.of(inscricaoProg1)); // só retorna do programa selecionado
+        when(usuarios.findAllById(any())).thenReturn(java.util.List.of(voluntario));
+
+        var lista = service.listarInscritos(PROGRAMA_ID, "APROVADA", "507f1f77bcf86cd799439033");
+
+        assertEquals(1, lista.size());
+        // confirma que não veio inscrição do outro programa
+        assertTrue(lista.stream().noneMatch(i -> i.inscricaoId().equals("507f1f77bcf86cd799439055")));
+        verify(inscricoes, never()).findByProgramaIdAndStatus(eq(outroPrograma), any());
     }
 
     @Test
     void deveBloquearConsultaDeInscritosSemPermissao() {
         autenticarComoResponsavel("interessado", true);
         var erro = assertThrows(AuthException.class,
-                () -> service.listarInscritos(PROGRAMA_ID, "507f1f77bcf86cd799439033"));
+                () -> service.listarInscritos(PROGRAMA_ID, null, "507f1f77bcf86cd799439033"));
         assertEquals(HttpStatus.FORBIDDEN, erro.getStatus());
         autenticarComoResponsavel("responsavel", false);
         assertThrows(AuthException.class,
-                () -> service.listarInscritos(PROGRAMA_ID, "507f1f77bcf86cd799439033"));
+                () -> service.listarInscritos(PROGRAMA_ID, null, "507f1f77bcf86cd799439033"));
         assertEquals(HttpStatus.UNAUTHORIZED,
-                assertThrows(AuthException.class, () -> service.listarInscritos(PROGRAMA_ID, null)).getStatus());
-        verify(inscricoes, never()).findByProgramaId(any());
+                assertThrows(AuthException.class, () -> service.listarInscritos(PROGRAMA_ID, null, null)).getStatus());
+        verify(inscricoes, never()).findByProgramaIdAndStatus(any(), any());
     }
 
     @Test
@@ -143,9 +182,9 @@ class InscricaoServiceTest {
         autenticarComoResponsavel("responsavel", true);
         when(programas.existsById(PROGRAMA_ID)).thenReturn(false);
         assertThrows(ResourceNotFoundException.class,
-                () -> service.listarInscritos(PROGRAMA_ID, "507f1f77bcf86cd799439033"));
+                () -> service.listarInscritos(PROGRAMA_ID, null, "507f1f77bcf86cd799439033"));
         assertThrows(ResourceNotFoundException.class,
-                () -> service.listarInscritos("invalido", "507f1f77bcf86cd799439033"));
+                () -> service.listarInscritos("invalido", null, "507f1f77bcf86cd799439033"));
     }
 
     private static final String RESPONSAVEL_ID = "507f1f77bcf86cd799439033";

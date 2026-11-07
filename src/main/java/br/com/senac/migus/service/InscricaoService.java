@@ -107,12 +107,67 @@ public class InscricaoService {
         return solicitante;
     }
 
-    public List<InscritoDTO> listarInscritos(String programaId, String usuarioId) {
+    public static final String STATUS_APROVADA = "APROVADA";
+    public static final String STATUS_TRANSFERIDA = "TRANSFERIDA";
+
+    public Inscricao transferir(String inscricaoId, String programaDestinoId, String usuarioId) {
+        var responsavel = exigirResponsavelAtivo(usuarioId, "Somente um responsável ativo pode transferir voluntários");
+
+        if (!ObjectId.isValid(inscricaoId)) {
+            throw new ResourceNotFoundException("Inscrição não encontrada");
+        }
+        var inscricaoOrigem = inscricoes.findById(inscricaoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Inscrição não encontrada"));
+
+        if (!STATUS_APROVADA.equals(inscricaoOrigem.getStatus())) {
+            throw new AuthException("Somente inscrições aprovadas podem ser transferidas", HttpStatus.CONFLICT);
+        }
+
+        var programaOrigem = programas.findById(inscricaoOrigem.getProgramaId())
+                .orElseThrow(() -> new ResourceNotFoundException("Programa de origem não encontrado"));
+
+        if (!responsavel.getId().equals(programaOrigem.getResponsavelId())) {
+            throw new AuthException("Somente o responsável pelo programa de origem pode transferir voluntários",
+                    HttpStatus.FORBIDDEN);
+        }
+
+        if (inscricaoOrigem.getProgramaId().equals(programaDestinoId)) {
+            throw new IllegalArgumentException("O voluntário já está neste programa");
+        }
+
+        if (!ObjectId.isValid(programaDestinoId)) {
+            throw new ResourceNotFoundException("Programa destino não encontrado");
+        }
+        var programaDestino = programas.findById(programaDestinoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Programa destino não encontrado"));
+
+        if (!Boolean.TRUE.equals(programaDestino.getAtivo())) {
+            throw new IllegalArgumentException("O programa destino não está ativo");
+        }
+
+        if (inscricoes.existsByVoluntarioIdAndProgramaId(inscricaoOrigem.getVoluntarioId(), programaDestinoId)) {
+            throw new AuthException("O voluntário já está inscrito no programa destino", HttpStatus.CONFLICT);
+        }
+
+        var agora = new Date();
+        inscricaoOrigem.transferir(agora);
+        inscricoes.save(inscricaoOrigem);
+
+        var novaInscricao = new Inscricao(new ObjectId().toHexString(),
+                inscricaoOrigem.getVoluntarioId(), programaDestinoId,
+                STATUS_APROVADA, agora, agora, null, agora);
+        return inscricoes.save(novaInscricao);
+    }
+
+
+    public List<InscritoDTO> listarInscritos(String programaId, String status, String usuarioId) {
         exigirResponsavelAtivo(usuarioId, "Somente um responsável ativo pode consultar os inscritos");
         if (!ObjectId.isValid(programaId) || !programas.existsById(programaId)) {
             throw new ResourceNotFoundException("Programa não encontrado");
         }
-        var lista = inscricoes.findByProgramaId(programaId);
+        var lista = (status != null && !status.isBlank())
+                ? inscricoes.findByProgramaIdAndStatus(programaId, status.toUpperCase())
+                : inscricoes.findByProgramaId(programaId);
         Map<String, Usuarios> porId = usuarios.findAllById(
                         lista.stream().map(Inscricao::getVoluntarioId).distinct().toList())
                 .stream().collect(Collectors.toMap(Usuarios::getId, Function.identity()));
