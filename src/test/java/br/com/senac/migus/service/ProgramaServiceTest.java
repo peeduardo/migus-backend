@@ -100,4 +100,85 @@ class ProgramaServiceTest {
         assertNull(programa.getDataAtualizacao());
         verify(programas).save(programa);
     }
+    private ProgramaService service() {
+        return new ProgramaService(programas, usuarios);
+    }
+    private ProgramaRepository programas = mock(ProgramaRepository.class);
+    private UsuariosRepository usuarios = mock(UsuariosRepository.class);
+
+    private Usuarios responsavel(String id, String tipo, boolean ativo) {
+        var u = new Usuarios(); u.setId(id); u.setTipoUsuario(tipo); u.setAtivo(ativo); return u;
+    }
+
+    private Programa programa(String id, String responsavelId) {
+        return new Programa(id, "P", "D", null, null, "09:00", "18:00", true, responsavelId, new Date(), null);
+    }
+
+    // --- alterarDisponibilidade ---
+
+    @Test
+    void deveAlterarDisponibilidade() {
+        var r = responsavel("resp-1", "RESPONSAVEL", true);
+        when(usuarios.findById("resp-1")).thenReturn(Optional.of(r));
+        when(programas.findByIdAndResponsavelId("prog-1", "resp-1")).thenReturn(Optional.of(programa("prog-1", "resp-1")));
+        when(programas.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        var resultado = service().alterarDisponibilidade("prog-1", false, "resp-1");
+
+        assertFalse(resultado.getAtivo());
+        verify(programas).save(any());
+    }
+
+    @Test
+    void deveBloquearAlteracaoSemAutenticacao() {
+        assertEquals(HttpStatus.UNAUTHORIZED,
+                assertThrows(AuthException.class, () -> service().alterarDisponibilidade("p", true, null)).getStatus());
+    }
+
+    @Test
+    void deveBloquearAlteracaoSemAtivo() {
+        assertEquals(HttpStatus.BAD_REQUEST,
+                assertThrows(AuthException.class, () -> service().alterarDisponibilidade("p", null, "x")).getStatus());
+    }
+
+    @Test
+    void deveBloquearAlteracaoDeNaoResponsavel() {
+        when(usuarios.findById("u")).thenReturn(Optional.of(responsavel("u", "interessado", true)));
+        assertEquals(HttpStatus.FORBIDDEN,
+                assertThrows(AuthException.class, () -> service().alterarDisponibilidade("p", true, "u")).getStatus());
+    }
+
+    @Test
+    void deveBloquearAlteracaoDeProgramaDeOutroResponsavel() {
+        when(usuarios.findById("u")).thenReturn(Optional.of(responsavel("u", "RESPONSAVEL", true)));
+        when(programas.findByIdAndResponsavelId(any(), any())).thenReturn(Optional.empty());
+        assertEquals(HttpStatus.NOT_FOUND,
+                assertThrows(AuthException.class, () -> service().alterarDisponibilidade("p", true, "u")).getStatus());
+    }
+
+    // --- listarMeusProgramas ---
+
+    @Test
+    void deveListarMeusProgramas() {
+        var r = responsavel("resp-1", "RESPONSAVEL", true);
+        when(usuarios.findById("resp-1")).thenReturn(Optional.of(r));
+        when(programas.findByResponsavelId("resp-1")).thenReturn(List.of(programa("p1", "resp-1")));
+
+        var lista = service().listarMeusProgramas("resp-1");
+
+        assertEquals(1, lista.size());
+    }
+
+    @Test
+    void deveBloquearListarMeusProgramasSemAuth() {
+        assertEquals(HttpStatus.UNAUTHORIZED,
+                assertThrows(AuthException.class, () -> service().listarMeusProgramas(null)).getStatus());
+    }
+
+    @Test
+    void deveBloquearListarMeusProgramasDeNaoResponsavel() {
+        when(usuarios.findById("u")).thenReturn(Optional.of(responsavel("u", "interessado", true)));
+        assertEquals(HttpStatus.FORBIDDEN,
+                assertThrows(AuthException.class, () -> service().listarMeusProgramas("u")).getStatus());
+    }
 }

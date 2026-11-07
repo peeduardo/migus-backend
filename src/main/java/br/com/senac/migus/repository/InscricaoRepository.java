@@ -8,5 +8,7 @@ import java.util.List;
 public interface InscricaoRepository extends MongoRepository<Inscricao, String> {
     List<Inscricao> findByProgramaId(String programaId);
 
+    List<Inscricao> findByProgramaIdAndStatus(String programaId, String status);
+
     boolean existsByVoluntarioIdAndProgramaId(String voluntarioId, String programaId);
 }

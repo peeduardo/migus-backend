@@ -81,7 +81,7 @@ class AuthServiceTest {
 
         var resposta = authService.cadastrar(request);
 
-        assertEquals("responsavel", resposta.usuario().tipoUsuario());
+        assertEquals("RESPONSAVEL", resposta.usuario().tipoUsuario());
     }
 
     @Test
