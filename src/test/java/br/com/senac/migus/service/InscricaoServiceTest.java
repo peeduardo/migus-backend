@@ -8,6 +8,10 @@ import br.com.senac.migus.model.Usuarios;
 import br.com.senac.migus.repository.InscricaoRepository;
 import br.com.senac.migus.repository.ProgramaRepository;
 import br.com.senac.migus.repository.UsuariosRepository;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -112,7 +116,7 @@ class InscricaoServiceTest {
         voluntario.setTelefone("11999999999");
         var inscricao = new Inscricao("507f1f77bcf86cd799439044", USUARIO_ID, PROGRAMA_ID, "APROVADA",
                 new Date(), new Date(), null, null);
-        when(programas.existsById(PROGRAMA_ID)).thenReturn(true);
+        programaDoResponsavel(RESPONSAVEL_ID);
         when(inscricoes.findByProgramaIdAndStatus(PROGRAMA_ID, "APROVADA")).thenReturn(java.util.List.of(inscricao));
         when(usuarios.findAllById(java.util.List.of(USUARIO_ID))).thenReturn(java.util.List.of(voluntario));
 
@@ -132,7 +136,7 @@ class InscricaoServiceTest {
     @Test
     void deveRetornarListaVaziaQuandoNaoHaVoluntariosVinculados() {
         autenticarComoResponsavel("responsavel", true);
-        when(programas.existsById(PROGRAMA_ID)).thenReturn(true);
+        programaDoResponsavel(RESPONSAVEL_ID);
         when(inscricoes.findByProgramaId(PROGRAMA_ID)).thenReturn(java.util.List.of());
 
         var lista = service.listarInscritos(PROGRAMA_ID, null, "507f1f77bcf86cd799439033");
@@ -150,7 +154,7 @@ class InscricaoServiceTest {
         // inscrição no PROGRAMA_ID
         var inscricaoProg1 = new Inscricao("507f1f77bcf86cd799439044", USUARIO_ID, PROGRAMA_ID, "APROVADA",
                 new Date(), new Date(), null, null);
-        when(programas.existsById(PROGRAMA_ID)).thenReturn(true);
+        programaDoResponsavel(RESPONSAVEL_ID);
         when(inscricoes.findByProgramaIdAndStatus(PROGRAMA_ID, "APROVADA"))
                 .thenReturn(java.util.List.of(inscricaoProg1)); // só retorna do programa selecionado
         when(usuarios.findAllById(any())).thenReturn(java.util.List.of(voluntario));
@@ -180,7 +184,7 @@ class InscricaoServiceTest {
     @Test
     void deveFalharAoListarInscritosDeProgramaInexistente() {
         autenticarComoResponsavel("responsavel", true);
-        when(programas.existsById(PROGRAMA_ID)).thenReturn(false);
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.empty());
         assertThrows(ResourceNotFoundException.class,
                 () -> service.listarInscritos(PROGRAMA_ID, null, "507f1f77bcf86cd799439033"));
         assertThrows(ResourceNotFoundException.class,
@@ -360,5 +364,88 @@ class InscricaoServiceTest {
 
         assertEquals(HttpStatus.CONFLICT, assertThrows(AuthException.class,
                 () -> service.transferir(INSCRICAO_ID, DESTINO_ID, RESPONSAVEL_ID)).getStatus());
+    }
+
+    @Test
+    void deveConsultarMinhasInscricoesComProgramaDataEStatus() {
+        var data = new Date(1760000000000L);
+        var inscricao = new Inscricao("inscricao-1", USUARIO_ID, PROGRAMA_ID, "PENDENTE",
+                data, null, null, null);
+        when(inscricoes.findByVoluntarioId(USUARIO_ID)).thenReturn(java.util.List.of(inscricao));
+        when(programas.findAllById(java.util.List.of(PROGRAMA_ID))).thenReturn(java.util.List.of(programa(true)));
+
+        var lista = service.listarMinhasInscricoes(USUARIO_ID);
+
+        assertEquals(1, lista.size());
+        assertEquals("inscricao-1", lista.get(0).inscricaoId());
+        assertEquals(PROGRAMA_ID, lista.get(0).programaId());
+        assertEquals("Apoio", lista.get(0).programaNome());
+        assertEquals(data, lista.get(0).dataInscricao());
+        assertEquals("PENDENTE", lista.get(0).status());
+        verify(inscricoes, never()).save(any());
+    }
+
+    @Test
+    void deveRetornarListaVaziaSemConsultarProgramas() {
+        when(inscricoes.findByVoluntarioId(USUARIO_ID)).thenReturn(java.util.List.of());
+        assertTrue(service.listarMinhasInscricoes(USUARIO_ID).isEmpty());
+        verify(programas, never()).findAllById(any());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"PENDENTE,true", "APROVADA,false", "RECUSADA,true"})
+    void devePreservarStatusEIncluirProgramaInativo(String status, boolean ativo) {
+        var inscricao = new Inscricao("inscricao-1", USUARIO_ID, PROGRAMA_ID, status,
+                new Date(), null, null, null);
+        when(inscricoes.findByVoluntarioId(USUARIO_ID)).thenReturn(java.util.List.of(inscricao));
+        when(programas.findAllById(java.util.List.of(PROGRAMA_ID))).thenReturn(java.util.List.of(programa(ativo)));
+        var lista = service.listarMinhasInscricoes(USUARIO_ID);
+        assertEquals(status, lista.get(0).status());
+        assertEquals("Apoio", lista.get(0).programaNome());
+        verify(programas, never()).findByAtivoTrue();
+    }
+
+    @Test
+    void deveManterInscricaoQuandoProgramaNaoExiste() {
+        var inscricao = new Inscricao("inscricao-1", USUARIO_ID, PROGRAMA_ID, "RECUSADA",
+                new Date(), null, null, null);
+        when(inscricoes.findByVoluntarioId(USUARIO_ID)).thenReturn(java.util.List.of(inscricao));
+        when(programas.findAllById(java.util.List.of(PROGRAMA_ID))).thenReturn(java.util.List.of());
+        var lista = service.listarMinhasInscricoes(USUARIO_ID);
+        assertEquals(1, lista.size());
+        assertEquals(PROGRAMA_ID, lista.get(0).programaId());
+        assertNull(lista.get(0).programaNome());
+        assertEquals("RECUSADA", lista.get(0).status());
+        verify(inscricoes, never()).delete(any(Inscricao.class));
+    }
+
+    @Test
+    void deveExigirUsuarioExistenteEAtivoNaConsultaPropria() {
+        assertEquals(HttpStatus.UNAUTHORIZED, assertThrows(AuthException.class,
+                () -> service.listarMinhasInscricoes(null)).getStatus());
+        when(usuarios.findById(USUARIO_ID)).thenReturn(Optional.empty());
+        assertEquals(HttpStatus.FORBIDDEN, assertThrows(AuthException.class,
+                () -> service.listarMinhasInscricoes(USUARIO_ID)).getStatus());
+        var usuario = new Usuarios();
+        usuario.setAtivo(false);
+        when(usuarios.findById(USUARIO_ID)).thenReturn(Optional.of(usuario));
+        assertEquals(HttpStatus.FORBIDDEN, assertThrows(AuthException.class,
+                () -> service.listarMinhasInscricoes(USUARIO_ID)).getStatus());
+        usuario.setAtivo(null);
+        assertEquals(HttpStatus.FORBIDDEN, assertThrows(AuthException.class,
+                () -> service.listarMinhasInscricoes(USUARIO_ID)).getStatus());
+        verify(inscricoes, never()).findByVoluntarioId(any());
+    }
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = "PENDENTE")
+    void deveBloquearConsultaDeInscritosDeOutroResponsavel(String status) {
+        autenticarComoResponsavel("RESPONSAVEL", true);
+        programaDoResponsavel(USUARIO_ID);
+        var erro = assertThrows(AuthException.class,
+                () -> service.listarInscritos(PROGRAMA_ID, status, RESPONSAVEL_ID));
+        assertEquals(HttpStatus.FORBIDDEN, erro.getStatus());
+        verifyNoInteractions(inscricoes);
+        verify(usuarios, never()).findAllById(any());
     }
 }

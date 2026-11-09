@@ -27,6 +27,7 @@ class UsuariosAutorizacaoTest {
         var usuario = new Usuarios();
         usuario.setId("usuario-1");
         usuario.setEmail("ana@exemplo.com");
+        usuario.setCpf("01234567890");
         usuario.setTipoUsuario("interessado");
         usuario.setAtivo(true);
         when(repository.findById("usuario-1")).thenReturn(Optional.of(usuario));
@@ -66,5 +67,16 @@ class UsuariosAutorizacaoTest {
                         """))
                 .andExpect(status().isForbidden());
         verify(repository, never()).save(any());
+    }
+    @Test
+    void devePreservarCpfOriginalNaAtualizacao() throws Exception {
+        mvc.perform(put("/api/usuarios/usuario-1").principal(() -> "usuario-1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"nome":"Ana Maria","email":"ana@exemplo.com","cpf":"11122233344"}
+                        """))
+                .andExpect(status().isOk());
+        verify(repository).save(argThat(usuario -> "01234567890".equals(usuario.getCpf())
+                && "Ana Maria".equals(usuario.getNome())));
     }
 }

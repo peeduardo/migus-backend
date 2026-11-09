@@ -7,6 +7,10 @@ import br.com.senac.migus.exception.GlobalExceptionHandler;
 import br.com.senac.migus.repository.UsuariosRepository;
 import br.com.senac.migus.service.AuthService;
 import br.com.senac.migus.service.JwtService;
+import br.com.senac.migus.model.Usuarios;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import jakarta.servlet.Filter;
 import org.junit.jupiter.api.*;
 import org.springframework.context.annotation.*;
@@ -93,6 +97,41 @@ class AuthControllerTest {
                 .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest());
         verify(authService, never()).cadastrar(any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "1234567890A", "1234567890", "123456789012", "123.456.789-00"})
+    void deveRejeitarCpfForaDoFormato(String cpf) throws Exception {
+        mvc.perform(post("/api/auth/cadastro").contentType(MediaType.APPLICATION_JSON)
+                .content(CADASTRO.replace("12345678900", cpf)))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(authService);
+    }
+
+    private MockMvc cadastroComRepository(UsuariosRepository usuarios) {
+        var service = new AuthService(usuarios, mock(PasswordEncoder.class), mock(JwtService.class));
+        return MockMvcBuilders.standaloneSetup(new AuthController(service))
+                .setControllerAdvice(new GlobalExceptionHandler()).build();
+    }
+
+    @Test
+    void deveAceitarOnzeDigitosIncluindoZeroInicial() throws Exception {
+        var usuarios = mock(UsuariosRepository.class);
+        when(usuarios.save(any(Usuarios.class))).thenAnswer(call -> call.getArgument(0));
+        cadastroComRepository(usuarios).perform(post("/api/auth/cadastro").contentType(MediaType.APPLICATION_JSON)
+                .content(CADASTRO.replace("12345678900", "01234567890")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.usuario.cpf").value("01234567890"));
+    }
+
+    @Test
+    void deveRejeitarCpfJaCadastrado() throws Exception {
+        var usuarios = mock(UsuariosRepository.class);
+        when(usuarios.existsByCpf("12345678900")).thenReturn(true);
+        cadastroComRepository(usuarios).perform(post("/api/auth/cadastro").contentType(MediaType.APPLICATION_JSON)
+                .content(CADASTRO))
+                .andExpect(status().isConflict());
+        verify(usuarios, never()).save(any());
     }
 
     @Test
