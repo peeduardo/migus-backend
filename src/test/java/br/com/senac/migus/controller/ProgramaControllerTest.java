@@ -1,5 +1,6 @@
 package br.com.senac.migus.controller;
 
+import br.com.senac.migus.config.CorsConfig;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -29,7 +30,7 @@ import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class ProgramaControllerTest {
@@ -125,7 +126,7 @@ class ProgramaControllerTest {
         when(usuarios.findById(USUARIO_ID)).thenReturn(Optional.empty());
         mvc.perform(post("/api/programas").header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON).content(PEDIDO))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
         verify(programas, never()).save(any());
     }
 
@@ -221,8 +222,8 @@ class ProgramaControllerTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"interessado,true", "VOLUNTARIO,true", "RESPONSAVEL,false"})
-    void deveRetornar403ParaPerfilOuStatusSemPermissao(String perfil, boolean ativo) throws Exception {
+    @CsvSource({"interessado,true", "VOLUNTARIO,true"})
+    void deveRetornar403ParaPerfilSemPermissao(String perfil, boolean ativo) throws Exception {
         var usuario = new Usuarios();
         usuario.setId(USUARIO_ID);
         usuario.setTipoUsuario(perfil);
@@ -251,10 +252,78 @@ class ProgramaControllerTest {
         verify(usuarios, never()).save(any());
     }
 
+    private static final String DESATIVAR = "/api/usuarios/me/desativar";
+
+    @ParameterizedTest
+    @ValueSource(strings = {"interessado", "VOLUNTARIO"})
+    void desativaParticipanteERecusaMesmoJwtNasProximasOperacoes(String perfil) throws Exception {
+        var participante = usuarios.findById(USUARIO_ID).orElseThrow();
+        participante.setTipoUsuario(perfil);
+        when(usuarios.desativarParticipante(eq(USUARIO_ID), eq(perfil), any())).thenAnswer(chamada -> {
+            participante.setAtivo(false);
+            return 1L;
+        });
+        String autorizacao = "Bearer " + token;
+        mvc.perform(patch(DESATIVAR).header("Authorization", autorizacao)).andExpect(status().isNoContent());
+        mvc.perform(get("/api/usuarios/me").header("Authorization", autorizacao)).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/programas").header("Authorization", autorizacao)).andExpect(status().isUnauthorized());
+        mvc.perform(patch(DESATIVAR).header("Authorization", autorizacao)).andExpect(status().isUnauthorized());
+        verify(usuarios).desativarParticipante(eq(USUARIO_ID), eq(perfil), any());
+        verifyNoInteractions(programas);
+
+        var outraConta = new Usuarios();
+        outraConta.setId("outra");
+        outraConta.setAtivo(true);
+        when(usuarios.findById("outra")).thenReturn(Optional.of(outraConta));
+        String outroJwt = context.getBean(JwtService.class).generateToken("outra", "outra@exemplo.invalid", perfil);
+        mvc.perform(get("/api/usuarios/me").header("Authorization", "Bearer " + outroJwt))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.id").value("outra"));
+    }
+
+    @Test
+    void responsavelNoBancoNaoPodeDesativarMesmoComJwtDeParticipante() throws Exception {
+        mvc.perform(patch(DESATIVAR).header("Authorization", "Bearer " + token)).andExpect(status().isForbidden());
+        verify(usuarios, never()).desativarParticipante(any(), any(), any());
+    }
+
+    @Test
+    void rejeitaIdentidadeEnviadaPeloCliente() throws Exception {
+        usuarios.findById(USUARIO_ID).orElseThrow().setTipoUsuario("VOLUNTARIO");
+        mvc.perform(patch(DESATIVAR + "?id=outra").header("Authorization", "Bearer " + token))
+                .andExpect(status().isBadRequest());
+        mvc.perform(patch(DESATIVAR).header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"id\":\"outra\"}"))
+                .andExpect(status().isBadRequest());
+        verify(usuarios, never()).desativarParticipante(any(), any(), any());
+    }
+
+    @Test
+    void rejeitaDesativacaoSemIdentidadeValida() throws Exception {
+        String chave = Base64.getEncoder().encodeToString(
+                "chave-ficticia-apenas-para-testes-123456789".getBytes(StandardCharsets.UTF_8));
+        String vencido = new JwtService(chave, -60000).generateToken(USUARIO_ID, "ana@exemplo.invalid", "VOLUNTARIO");
+        mvc.perform(patch(DESATIVAR)).andExpect(status().isForbidden());
+        for (String invalido : new String[]{"invalido", vencido}) {
+            mvc.perform(patch(DESATIVAR).header("Authorization", "Bearer " + invalido)).andExpect(status().isForbidden());
+        }
+        when(usuarios.findById(USUARIO_ID)).thenReturn(Optional.empty());
+        mvc.perform(patch(DESATIVAR).header("Authorization", "Bearer " + token)).andExpect(status().isUnauthorized());
+        verify(usuarios, never()).desativarParticipante(any(), any(), any());
+    }
+
+    @Test
+    void permitePreflightDaDesativacaoSemAutenticacao() throws Exception {
+        mvc.perform(options(DESATIVAR).header("Origin", "http://localhost:3000")
+                        .header("Access-Control-Request-Method", "PATCH")
+                        .header("Access-Control-Request-Headers", "Authorization"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3000"));
+    }
+
     @Configuration
     @EnableWebMvc
     @EnableWebSecurity
-    @Import({SecurityConfig.class, ProgramaController.class, ProgramaService.class,
+    @Import({CorsConfig.class, SecurityConfig.class, ProgramaController.class, ProgramaService.class,
             UsuariosController.class, UsuariosService.class, GlobalExceptionHandler.class})
     static class Config {
         @Bean UsuariosRepository usuariosRepository() { return mock(UsuariosRepository.class); }
