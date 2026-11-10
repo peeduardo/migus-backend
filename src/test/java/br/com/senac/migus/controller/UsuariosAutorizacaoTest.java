@@ -31,7 +31,7 @@ class UsuariosAutorizacaoTest {
         usuario.setTipoUsuario("interessado");
         usuario.setAtivo(true);
         when(repository.findById("usuario-1")).thenReturn(Optional.of(usuario));
-        when(repository.save(any(Usuarios.class))).thenAnswer(call -> call.getArgument(0));
+        when(repository.atualizarDadosPessoais(any(), any(), any(), any(), any(), any())).thenReturn(1L);
         mvc = MockMvcBuilders.standaloneSetup(new UsuariosController(new UsuariosService(repository)))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
     }
@@ -45,6 +45,7 @@ class UsuariosAutorizacaoTest {
                         """))
                 .andExpect(status().isForbidden());
         verify(repository, never()).save(any());
+        verify(repository, never()).atualizarDadosPessoais(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -56,6 +57,7 @@ class UsuariosAutorizacaoTest {
                         """))
                 .andExpect(status().isForbidden());
         verify(repository, never()).save(any());
+        verify(repository, never()).atualizarDadosPessoais(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -67,6 +69,7 @@ class UsuariosAutorizacaoTest {
                         """))
                 .andExpect(status().isForbidden());
         verify(repository, never()).save(any());
+        verify(repository, never()).atualizarDadosPessoais(any(), any(), any(), any(), any(), any());
     }
     @Test
     void devePreservarCpfOriginalNaAtualizacao() throws Exception {
@@ -75,8 +78,8 @@ class UsuariosAutorizacaoTest {
                 .content("""
                         {"nome":"Ana Maria","email":"ana@exemplo.com","cpf":"11122233344"}
                         """))
-                .andExpect(status().isOk());
-        verify(repository).save(argThat(usuario -> "01234567890".equals(usuario.getCpf())
-                && "Ana Maria".equals(usuario.getNome())));
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.usuario.cpf").value("01234567890"));
+        verify(repository).atualizarDadosPessoais(eq("usuario-1"), eq("Ana Maria"), eq("ana@exemplo.com"), any(), any(), any());
     }
 }
