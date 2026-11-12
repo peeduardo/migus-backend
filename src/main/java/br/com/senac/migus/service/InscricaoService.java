@@ -1,5 +1,7 @@
 package br.com.senac.migus.service;
 
+import br.com.senac.migus.dto.MinhaInscricaoDTO;
+import br.com.senac.migus.model.Programa;
 import br.com.senac.migus.dto.InscritoDTO;
 import br.com.senac.migus.exception.AuthException;
 import br.com.senac.migus.exception.ResourceNotFoundException;
@@ -194,11 +196,16 @@ public class InscricaoService {
         inscricao.sair(new Date());
         return inscricoes.save(inscricao);
     }
-
     public List<InscritoDTO> listarInscritos(String programaId, String status, String usuarioId) {
-        exigirResponsavelAtivo(usuarioId, "Somente um responsável ativo pode consultar os inscritos");
-        if (!ObjectId.isValid(programaId) || !programas.existsById(programaId)) {
+        var responsavel = exigirResponsavelAtivo(usuarioId, "Somente um responsável ativo pode consultar os inscritos");
+        if (!ObjectId.isValid(programaId)) {
             throw new ResourceNotFoundException("Programa não encontrado");
+        }
+        var programa = programas.findById(programaId)
+                .orElseThrow(() -> new ResourceNotFoundException("Programa não encontrado"));
+        if (!responsavel.getId().equals(programa.getResponsavelId())) {
+            throw new AuthException("Somente o responsável pelo programa pode consultar os inscritos",
+                    HttpStatus.FORBIDDEN);
         }
         var lista = (status != null && !status.isBlank())
                 ? inscricoes.findByProgramaIdAndStatus(programaId, status.toUpperCase())
@@ -208,6 +215,26 @@ public class InscricaoService {
                 .stream().collect(Collectors.toMap(Usuarios::getId, Function.identity()));
         return lista.stream()
                 .map(inscricao -> InscritoDTO.of(inscricao, porId.get(inscricao.getVoluntarioId())))
+                .toList();
+    }
+
+    public List<MinhaInscricaoDTO> listarMinhasInscricoes(String usuarioId) {
+        if (usuarioId == null) {
+            throw new AuthException("Autenticação necessária", HttpStatus.UNAUTHORIZED);
+        }
+        var usuario = usuarios.findById(usuarioId)
+                .orElseThrow(() -> new AuthException("Usuário não encontrado", HttpStatus.FORBIDDEN));
+        if (!Boolean.TRUE.equals(usuario.getAtivo())) {
+            throw new AuthException("Somente um usuário ativo pode consultar suas inscrições", HttpStatus.FORBIDDEN);
+        }
+        var lista = inscricoes.findByVoluntarioId(usuarioId);
+        if (lista.isEmpty()) return List.of();
+
+        Map<String, Programa> porId = programas.findAllById(
+                        lista.stream().map(Inscricao::getProgramaId).distinct().toList())
+                .stream().collect(Collectors.toMap(Programa::getId, Function.identity()));
+        return lista.stream()
+                .map(inscricao -> MinhaInscricaoDTO.of(inscricao, porId.get(inscricao.getProgramaId())))
                 .toList();
     }
 }

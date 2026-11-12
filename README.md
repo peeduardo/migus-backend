@@ -129,3 +129,30 @@ com uma URI padrão `mongodb://` dos mesmos servidores do cluster, com TLS ligad
 A senha foi lida de forma oculta no terminal; a URI existiu somente na variável
 de ambiente do processo de teste e foi removida ao terminar. Não salve senhas
 ou URIs completas em comandos, arquivos do projeto ou logs.
+
+## C17 — RF10: Visualizar minhas inscrições
+
+`GET /api/usuarios/me/inscricoes` consulta somente as inscrições da conta autenticada e ativa.
+Envie o JWT no cabeçalho `Authorization: Bearer <token>`. O servidor usa a identidade
+do token; parâmetros ou corpo enviados pelo cliente não escolhem outro usuário.
+
+A resposta `200` é uma lista com `inscricaoId`, `programaId`, `programaNome`,
+`dataInscricao` (data ISO) e `status` (`PENDENTE`, `APROVADA`, `RECUSADA` ou `TRANSFERIDA`).
+Sem inscrições, retorna `[]`. Programas inativos também são consultados.
+Se um programa não existir, a inscrição continua na lista, com seu `programaId`
+e `programaNome: null`. A consulta não grava nem remove dados.
+
+Os testes verificam o service com repositories simulados e a rota HTTP com JWT,
+incluindo isolamento entre contas, tentativa de trocar a identidade, autenticação,
+conta inativa, lista vazia e programas inativos ou indisponíveis.
+
+Com Java 21, execute no Windows:
+
+```powershell
+.\mvnw.cmd -B -ntp clean verify
+```
+
+Esse comando executa os testes sem banco e gera `target/site/jacoco/jacoco.xml`.
+Validação real da RF10 em 06/11/2026, no banco `migus`, autorizada para dados fictícios exclusivos: cadastro público e login, lista vazia, inscrições existentes, os três estados, isolamento entre contas, programa inativo e programa ausente passaram na comparação entre API e MongoDB. Os IDs foram registrados fora do repositório. As 4 inscrições, 3 programas e 3 contas da execução foram removidos pelos IDs, com ausência confirmada. `migus_testes` e os dados anteriores foram preservados.
+
+Novos cadastros enquadrados na regra de domínio existente gravam `RESPONSAVEL`, como esperado pelo cadastro de programas e pela interface. Contas antigas não foram alteradas. Após essa correção, `clean verify` passou com 89 testes. A conferência manual feita pelo autor com frontend, backend e banco reais confirmou os três estados, isolamento entre contas, lista vazia, programa inativo e programa indisponível, em desktop e celular emulado de 393 px. A navegação por teclado foi conferida anteriormente na prévia simulada, separadamente. Ao encerrar a demonstração, foram removidas pelos IDs as 5 inscrições (incluindo a inscrição adicional), os 2 programas fictícios restantes e as 4 contas, com ausência confirmada. O Programa Amigos Legais e suas demais inscrições foram preservados; `migus_testes` não foi acessado na limpeza.

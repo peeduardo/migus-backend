@@ -163,6 +163,8 @@ class InscricaoControllerTest {
         responsavel.setAtivo(true);
         when(usuarios.findById(USUARIO_ID)).thenReturn(Optional.of(responsavel));
         when(programas.existsById(PROGRAMA_ID)).thenReturn(true);
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.of(
+                br.com.senac.migus.ControllerTestHelper.programaAtivo(PROGRAMA_ID, USUARIO_ID)));
 
         var inscrito = new InscritoDTO(INSCRICAO_ID, "APROVADA", new Date(),
                 USUARIO_ID, "Ana", "ana@exemplo.com", "11999999999");
@@ -189,6 +191,7 @@ class InscricaoControllerTest {
         responsavel.setAtivo(true);
         when(usuarios.findById(USUARIO_ID)).thenReturn(Optional.of(responsavel));
         when(programas.existsById(PROGRAMA_ID)).thenReturn(false);
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.empty());
 
         mvc.perform(get("/api/programas/{pId}/inscricoes", PROGRAMA_ID)
                 .header("Authorization", "Bearer " + token))
