@@ -160,6 +160,41 @@ public class InscricaoService {
     }
 
 
+    public static final String STATUS_SAIDA = "SAIDA";
+
+    public Inscricao registrarSaida(String programaId, String inscricaoId, String usuarioId) {
+        var responsavel = exigirResponsavelAtivo(usuarioId,
+                "Somente um responsável ativo pode registrar a saída de um voluntário");
+
+        if (!ObjectId.isValid(programaId) || !ObjectId.isValid(inscricaoId)) {
+            throw new ResourceNotFoundException("Inscrição não encontrada");
+        }
+
+        var programa = programas.findById(programaId)
+                .orElseThrow(() -> new ResourceNotFoundException("Programa não encontrado"));
+
+        if (!responsavel.getId().equals(programa.getResponsavelId())) {
+            throw new AuthException("Somente o responsável pelo programa pode registrar saídas",
+                    HttpStatus.FORBIDDEN);
+        }
+
+        var inscricao = inscricoes.findById(inscricaoId)
+                .filter(i -> programaId.equals(i.getProgramaId()))
+                .orElseThrow(() -> new ResourceNotFoundException("Voluntário não vinculado a este programa"));
+
+        if (STATUS_SAIDA.equals(inscricao.getStatus())) {
+            throw new AuthException("A saída deste voluntário já foi registrada", HttpStatus.CONFLICT);
+        }
+
+        if (!STATUS_APROVADA.equals(inscricao.getStatus())) {
+            throw new AuthException("Somente voluntários com inscrição aprovada podem ter saída registrada",
+                    HttpStatus.CONFLICT);
+        }
+
+        inscricao.sair(new Date());
+        return inscricoes.save(inscricao);
+    }
+
     public List<InscritoDTO> listarInscritos(String programaId, String status, String usuarioId) {
         exigirResponsavelAtivo(usuarioId, "Somente um responsável ativo pode consultar os inscritos");
         if (!ObjectId.isValid(programaId) || !programas.existsById(programaId)) {

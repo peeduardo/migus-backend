@@ -242,6 +242,82 @@ class InscricaoControllerTest {
                 .andExpect(status().isNotFound());
     }
 
+    // --- PATCH /saida ---
+
+    @Test
+    void deveRegistrarSaidaDeVoluntario() throws Exception {
+        var responsavel = new Usuarios();
+        responsavel.setId(USUARIO_ID);
+        responsavel.setTipoUsuario("RESPONSAVEL");
+        responsavel.setAtivo(true);
+        when(usuarios.findById(USUARIO_ID)).thenReturn(Optional.of(responsavel));
+
+        var inscricao = new Inscricao(INSCRICAO_ID, "voluntario-id", PROGRAMA_ID, "APROVADA",
+                new Date(), new Date(), null, null);
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.of(
+                br.com.senac.migus.ControllerTestHelper.programaAtivo(PROGRAMA_ID, USUARIO_ID)));
+        when(inscricoes.findById(INSCRICAO_ID)).thenReturn(Optional.of(inscricao));
+        when(inscricoes.save(any())).thenAnswer(call -> {
+            Inscricao i = call.getArgument(0); i.sair(new Date()); return i;
+        });
+
+        mvc.perform(patch("/api/programas/{pId}/inscricoes/{iId}/saida", PROGRAMA_ID, INSCRICAO_ID)
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SAIDA"));
+    }
+
+    @Test
+    void deveBloquearSaidaSemAutorizacao() throws Exception {
+        mvc.perform(patch("/api/programas/{pId}/inscricoes/{iId}/saida", PROGRAMA_ID, INSCRICAO_ID))
+                .andExpect(status().is4xxClientError());
+        verify(inscricoes, never()).save(any());
+    }
+
+    @Test
+    void deveRetornar403AoRegistrarSaidaDeOutroResponsavel() throws Exception {
+        // usuário sem tipoUsuario = RESPONSAVEL → 403
+        mvc.perform(patch("/api/programas/{pId}/inscricoes/{iId}/saida", PROGRAMA_ID, INSCRICAO_ID)
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void deveRetornar404AoRegistrarSaidaDeVoluntarioNaoVinculado() throws Exception {
+        var responsavel = new Usuarios();
+        responsavel.setId(USUARIO_ID);
+        responsavel.setTipoUsuario("RESPONSAVEL");
+        responsavel.setAtivo(true);
+        when(usuarios.findById(USUARIO_ID)).thenReturn(Optional.of(responsavel));
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.of(
+                br.com.senac.migus.ControllerTestHelper.programaAtivo(PROGRAMA_ID, USUARIO_ID)));
+        when(inscricoes.findById(INSCRICAO_ID)).thenReturn(Optional.empty());
+
+        mvc.perform(patch("/api/programas/{pId}/inscricoes/{iId}/saida", PROGRAMA_ID, INSCRICAO_ID)
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deveRetornar409AoRegistrarSaidaJaRegistrada() throws Exception {
+        var responsavel = new Usuarios();
+        responsavel.setId(USUARIO_ID);
+        responsavel.setTipoUsuario("RESPONSAVEL");
+        responsavel.setAtivo(true);
+        when(usuarios.findById(USUARIO_ID)).thenReturn(Optional.of(responsavel));
+
+        var inscricao = new Inscricao(INSCRICAO_ID, "voluntario-id", PROGRAMA_ID, "SAIDA",
+                new Date(), new Date(), null, null);
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.of(
+                br.com.senac.migus.ControllerTestHelper.programaAtivo(PROGRAMA_ID, USUARIO_ID)));
+        when(inscricoes.findById(INSCRICAO_ID)).thenReturn(Optional.of(inscricao));
+
+        mvc.perform(patch("/api/programas/{pId}/inscricoes/{iId}/saida", PROGRAMA_ID, INSCRICAO_ID)
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("A saída deste voluntário já foi registrada"));
+    }
+
     @Configuration
     @EnableWebMvc
     @EnableWebSecurity
