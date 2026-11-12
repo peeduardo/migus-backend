@@ -41,6 +41,15 @@ public class InscricaoController {
                 principal == null ? null : principal.getName()));
     }
 
+    @PatchMapping("/{inscricaoId}/saida")
+    public ResponseEntity<Inscricao> registrarSaida(
+            @PathVariable String programaId,
+            @PathVariable String inscricaoId,
+            Principal principal) {
+        return ResponseEntity.ok(inscricoes.registrarSaida(programaId, inscricaoId,
+                principal == null ? null : principal.getName()));
+    }
+
     @PostMapping("/{inscricaoId}/transferir")
     public ResponseEntity<Inscricao> transferir(
             @PathVariable String programaId,

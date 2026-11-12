@@ -20,6 +20,7 @@ public class Inscricao {
     private Date dataAprovacao;
     private Date dataRecusa;
     private Date dataAtualizacao;
+    private Date dataSaida;
 
     public Inscricao(String id, String voluntarioId, String programaId, String status, Date dataInscricao,
                      Date dataAprovacao, Date dataRecusa, Date dataAtualizacao) {
@@ -56,6 +57,16 @@ public class Inscricao {
     }
     public Date getDataAtualizacao() {
         return dataAtualizacao;
+    }
+
+    public Date getDataSaida() {
+        return dataSaida;
+    }
+
+    public void sair(Date data) {
+        this.status = "SAIDA";
+        this.dataSaida = data;
+        this.dataAtualizacao = data;
     }
 
     public void transferir(Date data) {

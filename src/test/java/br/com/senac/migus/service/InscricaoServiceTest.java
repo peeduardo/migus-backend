@@ -116,6 +116,7 @@ class InscricaoServiceTest {
         voluntario.setTelefone("11999999999");
         var inscricao = new Inscricao("507f1f77bcf86cd799439044", USUARIO_ID, PROGRAMA_ID, "APROVADA",
                 new Date(), new Date(), null, null);
+        when(programas.existsById(PROGRAMA_ID)).thenReturn(true);
         programaDoResponsavel(RESPONSAVEL_ID);
         when(inscricoes.findByProgramaIdAndStatus(PROGRAMA_ID, "APROVADA")).thenReturn(java.util.List.of(inscricao));
         when(usuarios.findAllById(java.util.List.of(USUARIO_ID))).thenReturn(java.util.List.of(voluntario));
@@ -136,6 +137,7 @@ class InscricaoServiceTest {
     @Test
     void deveRetornarListaVaziaQuandoNaoHaVoluntariosVinculados() {
         autenticarComoResponsavel("responsavel", true);
+        when(programas.existsById(PROGRAMA_ID)).thenReturn(true);
         programaDoResponsavel(RESPONSAVEL_ID);
         when(inscricoes.findByProgramaId(PROGRAMA_ID)).thenReturn(java.util.List.of());
 
@@ -154,6 +156,7 @@ class InscricaoServiceTest {
         // inscrição no PROGRAMA_ID
         var inscricaoProg1 = new Inscricao("507f1f77bcf86cd799439044", USUARIO_ID, PROGRAMA_ID, "APROVADA",
                 new Date(), new Date(), null, null);
+        when(programas.existsById(PROGRAMA_ID)).thenReturn(true);
         programaDoResponsavel(RESPONSAVEL_ID);
         when(inscricoes.findByProgramaIdAndStatus(PROGRAMA_ID, "APROVADA"))
                 .thenReturn(java.util.List.of(inscricaoProg1)); // só retorna do programa selecionado
@@ -292,6 +295,73 @@ class InscricaoServiceTest {
         var erro = assertThrows(AuthException.class, () -> service.inscrever(PROGRAMA_ID, USUARIO_ID));
         assertEquals(HttpStatus.CONFLICT, erro.getStatus());
         verify(inscricoes, never()).save(any());
+    }
+
+    // --- registrarSaida ---
+
+    @Test
+    void deveRegistrarSaidaDeVoluntarioAprovado() {
+        autenticarComoResponsavel("RESPONSAVEL", true);
+        var inscricao = new Inscricao(INSCRICAO_ID, USUARIO_ID, PROGRAMA_ID, "APROVADA",
+                new Date(), new Date(), null, null);
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.of(
+                new Programa(PROGRAMA_ID, "P", "D", null, null, "09:00", "18:00", true, RESPONSAVEL_ID, new Date(), null)));
+        when(inscricoes.findById(INSCRICAO_ID)).thenReturn(Optional.of(inscricao));
+        when(inscricoes.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        var resultado = service.registrarSaida(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID);
+
+        assertEquals("SAIDA", resultado.getStatus());
+        assertNotNull(resultado.getDataSaida());
+        verify(inscricoes).save(inscricao);
+    }
+
+    @Test
+    void deveBloquearSaidaDeVoluntarioJaSaiu() {
+        autenticarComoResponsavel("RESPONSAVEL", true);
+        var inscricao = new Inscricao(INSCRICAO_ID, USUARIO_ID, PROGRAMA_ID, "SAIDA",
+                new Date(), new Date(), null, null);
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.of(
+                new Programa(PROGRAMA_ID, "P", "D", null, null, "09:00", "18:00", true, RESPONSAVEL_ID, new Date(), null)));
+        when(inscricoes.findById(INSCRICAO_ID)).thenReturn(Optional.of(inscricao));
+
+        assertEquals(HttpStatus.CONFLICT, assertThrows(AuthException.class,
+                () -> service.registrarSaida(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID)).getStatus());
+        verify(inscricoes, never()).save(any());
+    }
+
+    @Test
+    void deveBloquearSaidaDeVoluntarioNaoAprovado() {
+        autenticarComoResponsavel("RESPONSAVEL", true);
+        var inscricao = new Inscricao(INSCRICAO_ID, USUARIO_ID, PROGRAMA_ID, "PENDENTE",
+                new Date(), null, null, null);
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.of(
+                new Programa(PROGRAMA_ID, "P", "D", null, null, "09:00", "18:00", true, RESPONSAVEL_ID, new Date(), null)));
+        when(inscricoes.findById(INSCRICAO_ID)).thenReturn(Optional.of(inscricao));
+
+        assertEquals(HttpStatus.CONFLICT, assertThrows(AuthException.class,
+                () -> service.registrarSaida(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID)).getStatus());
+    }
+
+    @Test
+    void deveBloquearSaidaDeResponsavelDeOutroPrograma() {
+        autenticarComoResponsavel("RESPONSAVEL", true);
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.of(
+                new Programa(PROGRAMA_ID, "P", "D", null, null, "09:00", "18:00", true, "outro-resp", new Date(), null)));
+
+        assertEquals(HttpStatus.FORBIDDEN, assertThrows(AuthException.class,
+                () -> service.registrarSaida(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID)).getStatus());
+    }
+
+    @Test
+    void deveBloquearSaidaDeVoluntarioNaoVinculado() {
+        autenticarComoResponsavel("RESPONSAVEL", true);
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.of(
+                new Programa(PROGRAMA_ID, "P", "D", null, null, "09:00", "18:00", true, RESPONSAVEL_ID, new Date(), null)));
+        when(inscricoes.findById(INSCRICAO_ID)).thenReturn(Optional.empty());
+
+        assertThrows(br.com.senac.migus.exception.ResourceNotFoundException.class,
+                () -> service.registrarSaida(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID));
     }
 
     // --- transferir branches ---
