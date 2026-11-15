@@ -34,6 +34,14 @@ public class ProgramaController {
         return ResponseEntity.ok(programas.buscarPorId(id));
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<Programa> editar(@PathVariable String id,
+            @Valid @RequestBody ProgramaRequestDTO pedido,
+            Principal principal) {
+        var programa = programas.editar(id, pedido, principal == null ? null : principal.getName());
+        return ResponseEntity.ok(programa);
+    }
+
     @GetMapping("/ativos")
     public ResponseEntity<List<Programa>> listarAtivos() {
         return ResponseEntity.ok(programas.listarAtivos());

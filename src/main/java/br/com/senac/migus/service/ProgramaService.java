@@ -50,6 +50,36 @@ public class ProgramaService {
         return ProgramaDetalheDTO.fromEntity(programa);
     }
 
+    public Programa editar(String programaId, ProgramaRequestDTO pedido, String usuarioId) {
+        if (usuarioId == null) {
+            throw new AuthException("Autenticação necessária", HttpStatus.UNAUTHORIZED);
+        }
+        var responsavel = usuarios.findById(usuarioId)
+                .orElseThrow(() -> new AuthException("Usuário não encontrado", HttpStatus.FORBIDDEN));
+        if (!Boolean.TRUE.equals(responsavel.getAtivo())
+                || !"RESPONSAVEL".equals(responsavel.getTipoUsuario())) {
+            throw new AuthException("Somente um responsável ativo pode editar programas", HttpStatus.FORBIDDEN);
+        }
+        var programa = programas.findById(programaId)
+                .orElseThrow(() -> new ResourceNotFoundException("Programa não encontrado com o ID: " + programaId));
+        if (!responsavel.getId().equals(programa.getResponsavelId())) {
+            throw new AuthException("Somente o responsável pelo programa pode editá-lo", HttpStatus.FORBIDDEN);
+        }
+        var programaAtualizado = new Programa(
+                programa.getId(),
+                pedido.nome(),
+                pedido.descricao(),
+                pedido.categoria(),
+                pedido.diasDisponiveis(),
+                pedido.horarioInicio(),
+                pedido.horarioFim(),
+                pedido.ativo(),
+                programa.getResponsavelId(),
+                programa.getDataCadastro(),
+                new Date());
+        return programas.save(programaAtualizado);
+    }
+
     public List<Programa> listarAtivos() {
         return programas.findByAtivoTrue();
     }
