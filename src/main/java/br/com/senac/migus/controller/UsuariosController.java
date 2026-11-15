@@ -44,6 +44,12 @@ public class UsuariosController {
         return ResponseEntity.noContent().build();
     }
 
+    @PatchMapping("/{id}/inativar")
+    public ResponseEntity<UsuarioResponseDTO> inativarVoluntario(@PathVariable String id, Principal principal) {
+        UsuarioResponseDTO response = usuariosService.inativarVoluntario(id, principal == null ? null : principal.getName());
+        return ResponseEntity.ok(response);
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<UsuarioResponseDTO> atualizar(
             @PathVariable String id, Principal principal,

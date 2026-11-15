@@ -167,7 +167,7 @@ class InscricaoControllerTest {
                 br.com.senac.migus.ControllerTestHelper.programaAtivo(PROGRAMA_ID, USUARIO_ID)));
 
         var inscrito = new InscritoDTO(INSCRICAO_ID, "APROVADA", new Date(),
-                USUARIO_ID, "Ana", "ana@exemplo.com", "11999999999");
+                USUARIO_ID, "Ana", "ana@exemplo.com", "11999999999", true);
         when(inscricoes.findByProgramaIdAndStatus(eq(PROGRAMA_ID), eq("APROVADA")))
                 .thenReturn(List.of(new Inscricao(INSCRICAO_ID, USUARIO_ID, PROGRAMA_ID, "APROVADA",
                         new Date(), new Date(), null, null)));

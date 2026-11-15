@@ -24,6 +24,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -222,5 +223,128 @@ class UsuariosServiceTest {
                 .anyMatch(c -> c.getName().toLowerCase().contains("senha"));
 
         assertThat(temCampoSenha).isFalse();
+    }
+
+    private Usuarios conta(String id, String perfil, boolean ativo) {
+        var usuario = new Usuarios();
+        usuario.setId(id);
+        usuario.setTipoUsuario(perfil);
+        usuario.setAtivo(ativo);
+        return usuario;
+    }
+
+    @Test
+    void deveInativarVoluntarioAtivoPreservandoOsDemaisDados() {
+        when(usuariosRepository.findById("resp-1")).thenReturn(Optional.of(conta("resp-1", "RESPONSAVEL", true)));
+        when(usuariosRepository.findById("user-123")).thenReturn(Optional.of(usuarioExistente));
+        when(usuariosRepository.desativarParticipante(eq("user-123"), eq("VOLUNTARIO"), any())).thenReturn(1L);
+
+        UsuarioResponseDTO response = usuariosService.inativarVoluntario("user-123", "resp-1");
+
+        assertThat(response.mensagem()).isEqualTo("Cadastro inativado com sucesso!");
+        assertThat(response.usuario().id()).isEqualTo("user-123");
+        assertThat(response.usuario().ativo()).isFalse();
+        assertThat(response.usuario().dataAtualizacao()).isEqualTo(LocalDate.now());
+        assertThat(response.usuario().nome()).isEqualTo("João Silva");
+        assertThat(response.usuario().email()).isEqualTo("joao@email.com");
+        assertThat(response.usuario().cpf()).isEqualTo("12345678901");
+        assertThat(response.usuario().tipoUsuario()).isEqualTo("VOLUNTARIO");
+        assertThat(response.usuario().dataCadastro()).isEqualTo(LocalDate.of(2026, 1, 1));
+        verify(usuariosRepository).desativarParticipante("user-123", "VOLUNTARIO", LocalDate.now());
+        verify(usuariosRepository, never()).save(any());
+        verify(usuariosRepository, never()).deleteById(any());
+    }
+
+    @Test
+    void deveInativarCadastroDeInteressado() {
+        when(usuariosRepository.findById("resp-1")).thenReturn(Optional.of(conta("resp-1", "RESPONSAVEL", true)));
+        when(usuariosRepository.findById("int-1")).thenReturn(Optional.of(conta("int-1", "interessado", true)));
+        when(usuariosRepository.desativarParticipante(eq("int-1"), eq("interessado"), any())).thenReturn(1L);
+
+        UsuarioResponseDTO response = usuariosService.inativarVoluntario("int-1", "resp-1");
+
+        assertThat(response.usuario().ativo()).isFalse();
+    }
+
+    @Test
+    void deveExigirAutenticacaoParaInativar() {
+        assertThatThrownBy(() -> usuariosService.inativarVoluntario("user-123", null))
+                .isInstanceOf(AuthException.class)
+                .extracting(erro -> ((AuthException) erro).getStatus())
+                .isEqualTo(org.springframework.http.HttpStatus.UNAUTHORIZED);
+        verify(usuariosRepository, never()).desativarParticipante(any(), any(), any());
+    }
+
+    @Test
+    void deveBloquearInativacaoPorSolicitanteInexistente() {
+        when(usuariosRepository.findById("sumiu")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> usuariosService.inativarVoluntario("user-123", "sumiu"))
+                .isInstanceOf(AuthException.class)
+                .extracting(erro -> ((AuthException) erro).getStatus())
+                .isEqualTo(org.springframework.http.HttpStatus.FORBIDDEN);
+        verify(usuariosRepository, never()).desativarParticipante(any(), any(), any());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"interessado,true", "VOLUNTARIO,true", "RESPONSAVEL,false"})
+    void deveBloquearInativacaoPorUsuarioSemAutorizacao(String perfil, boolean ativo) {
+        when(usuariosRepository.findById("solicitante")).thenReturn(Optional.of(conta("solicitante", perfil, ativo)));
+
+        assertThatThrownBy(() -> usuariosService.inativarVoluntario("user-123", "solicitante"))
+                .isInstanceOf(AuthException.class)
+                .hasMessage("Somente um responsável ativo pode inativar cadastros")
+                .extracting(erro -> ((AuthException) erro).getStatus())
+                .isEqualTo(org.springframework.http.HttpStatus.FORBIDDEN);
+        verify(usuariosRepository, never()).desativarParticipante(any(), any(), any());
+    }
+
+    @Test
+    void deveTratarInativacaoDeCadastroInexistente() {
+        when(usuariosRepository.findById("resp-1")).thenReturn(Optional.of(conta("resp-1", "RESPONSAVEL", true)));
+        when(usuariosRepository.findById("inexistente")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> usuariosService.inativarVoluntario("inexistente", "resp-1"))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Voluntário não encontrado com o ID: inexistente");
+        verify(usuariosRepository, never()).desativarParticipante(any(), any(), any());
+    }
+
+    @Test
+    void naoDeveInativarCadastroDeOutroResponsavel() {
+        when(usuariosRepository.findById("resp-1")).thenReturn(Optional.of(conta("resp-1", "RESPONSAVEL", true)));
+        when(usuariosRepository.findById("resp-2")).thenReturn(Optional.of(conta("resp-2", "RESPONSAVEL", true)));
+
+        assertThatThrownBy(() -> usuariosService.inativarVoluntario("resp-2", "resp-1"))
+                .isInstanceOf(AuthException.class)
+                .hasMessage("Somente cadastros de voluntários podem ser inativados")
+                .extracting(erro -> ((AuthException) erro).getStatus())
+                .isEqualTo(org.springframework.http.HttpStatus.FORBIDDEN);
+        verify(usuariosRepository, never()).desativarParticipante(any(), any(), any());
+    }
+
+    @Test
+    void deveTratarCadastroJaInativo() {
+        when(usuariosRepository.findById("resp-1")).thenReturn(Optional.of(conta("resp-1", "RESPONSAVEL", true)));
+        when(usuariosRepository.findById("vol-1")).thenReturn(Optional.of(conta("vol-1", "VOLUNTARIO", false)));
+
+        assertThatThrownBy(() -> usuariosService.inativarVoluntario("vol-1", "resp-1"))
+                .isInstanceOf(AuthException.class)
+                .hasMessage("O cadastro já está inativo")
+                .extracting(erro -> ((AuthException) erro).getStatus())
+                .isEqualTo(org.springframework.http.HttpStatus.CONFLICT);
+        verify(usuariosRepository, never()).desativarParticipante(any(), any(), any());
+    }
+
+    @Test
+    void deveTratarCadastroInativadoDuranteAOperacao() {
+        when(usuariosRepository.findById("resp-1")).thenReturn(Optional.of(conta("resp-1", "RESPONSAVEL", true)));
+        when(usuariosRepository.findById("user-123")).thenReturn(Optional.of(usuarioExistente));
+        when(usuariosRepository.desativarParticipante(eq("user-123"), eq("VOLUNTARIO"), any())).thenReturn(0L);
+
+        assertThatThrownBy(() -> usuariosService.inativarVoluntario("user-123", "resp-1"))
+                .isInstanceOf(AuthException.class)
+                .extracting(erro -> ((AuthException) erro).getStatus())
+                .isEqualTo(org.springframework.http.HttpStatus.CONFLICT);
     }
 }

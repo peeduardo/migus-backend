@@ -12,7 +12,8 @@ public record InscritoDTO(
         String usuarioId,
         String nome,
         String email,
-        String telefone
+        String telefone,
+        Boolean usuarioAtivo
 ) {
     public static InscritoDTO of(Inscricao inscricao, Usuarios usuario) {
         return new InscritoDTO(
@@ -22,7 +23,8 @@ public record InscritoDTO(
                 inscricao.getVoluntarioId(),
                 usuario == null ? null : usuario.getNome(),
                 usuario == null ? null : usuario.getEmail(),
-                usuario == null ? null : usuario.getTelefone()
+                usuario == null ? null : usuario.getTelefone(),
+                usuario == null ? null : usuario.getAtivo()
         );
     }
 }
