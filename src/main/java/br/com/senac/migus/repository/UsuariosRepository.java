@@ -5,6 +5,7 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.data.mongodb.repository.Update;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 public interface UsuariosRepository extends MongoRepository<Usuarios, String> {
@@ -19,6 +20,8 @@ public interface UsuariosRepository extends MongoRepository<Usuarios, String> {
                                 LocalDate nascimento, LocalDate hoje);
 
     boolean existsByIdAndAtivoTrue(String id);
+
+    List<Usuarios> findByAtivoFalse();
 
     Optional<Usuarios> findByEmail(String email);
 
