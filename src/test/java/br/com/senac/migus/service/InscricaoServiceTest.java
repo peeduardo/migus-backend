@@ -41,6 +41,7 @@ class InscricaoServiceTest {
         var usuario = new Usuarios();
         usuario.setId(USUARIO_ID);
         usuario.setAtivo(true);
+        usuario.setTipoUsuario("INTERESSADO");
         when(usuarios.findById(USUARIO_ID)).thenReturn(Optional.of(usuario));
         when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.of(programa(true)));
         when(inscricoes.save(any(Inscricao.class))).thenAnswer(call -> call.getArgument(0));
@@ -453,6 +454,98 @@ class InscricaoServiceTest {
         assertEquals(data, lista.get(0).dataInscricao());
         assertEquals("PENDENTE", lista.get(0).status());
         verify(inscricoes, never()).save(any());
+    }
+
+    @Test
+    void deveConsultarHistoricoComProgramaSituacaoEPeriodoOrdenadoDoMaisRecente() {
+        var dataInscricaoAntiga = new Date(1_000L);
+        var dataInicioAntiga = new Date(2_000L);
+        var dataAtualizacaoAntiga = new Date(3_000L);
+        var registroAntigo = new Inscricao("inscricao-antiga", USUARIO_ID, PROGRAMA_ID, "APROVADA",
+                dataInscricaoAntiga, dataInicioAntiga, null, dataAtualizacaoAntiga);
+
+        var dataInscricaoRecente = new Date(4_000L);
+        var registroRecente = new Inscricao("inscricao-recente", USUARIO_ID, "507f1f77bcf86cd799439033",
+                "PENDENTE", dataInscricaoRecente, null, null, null);
+
+        when(inscricoes.findByVoluntarioId(USUARIO_ID))
+                .thenReturn(java.util.List.of(registroAntigo, registroRecente));
+        when(programas.findAllById(java.util.List.of("507f1f77bcf86cd799439033", PROGRAMA_ID)))
+                .thenReturn(java.util.List.of(
+                        new Programa("507f1f77bcf86cd799439033", "Programa recente", null, null, null,
+                                null, null, true, USUARIO_ID, dataInscricaoRecente, null),
+                        programa(true)));
+
+        var historico = service.consultarHistoricoParticipacao(USUARIO_ID);
+
+        assertEquals(2, historico.size());
+        assertEquals("inscricao-recente", historico.get(0).inscricaoId());
+        assertEquals("Programa recente", historico.get(0).programaNome());
+        assertEquals("PENDENTE", historico.get(0).situacao());
+        assertEquals(dataInscricaoRecente, historico.get(0).dataInscricao());
+        assertNull(historico.get(0).inicioParticipacao());
+        assertNull(historico.get(0).fimParticipacao());
+        assertEquals("inscricao-antiga", historico.get(1).inscricaoId());
+        assertEquals("Apoio", historico.get(1).programaNome());
+        assertEquals(dataInicioAntiga, historico.get(1).inicioParticipacao());
+        assertNull(historico.get(1).fimParticipacao());
+        verify(inscricoes).findByVoluntarioId(USUARIO_ID);
+        verify(inscricoes, never()).findByVoluntarioId("outro-voluntario");
+    }
+
+    @Test
+    void deveRetornarHistoricoVazioSemConsultarProgramas() {
+        when(inscricoes.findByVoluntarioId(USUARIO_ID)).thenReturn(java.util.List.of());
+
+        assertTrue(service.consultarHistoricoParticipacao(USUARIO_ID).isEmpty());
+
+        verify(programas, never()).findAllById(any());
+    }
+
+    @Test
+    void devePermitirHistoricoParaPerfilVoluntario() {
+        var voluntario = new Usuarios();
+        voluntario.setId(USUARIO_ID);
+        voluntario.setAtivo(true);
+        voluntario.setTipoUsuario("VOLUNTARIO");
+        when(usuarios.findById(USUARIO_ID)).thenReturn(Optional.of(voluntario));
+        when(inscricoes.findByVoluntarioId(USUARIO_ID)).thenReturn(java.util.List.of());
+
+        assertTrue(service.consultarHistoricoParticipacao(USUARIO_ID).isEmpty());
+    }
+
+    @Test
+    void devePermitirHistoricoApenasParaVoluntarioAtivo() {
+        var responsavel = new Usuarios();
+        responsavel.setId(USUARIO_ID);
+        responsavel.setAtivo(true);
+        responsavel.setTipoUsuario("RESPONSAVEL");
+        when(usuarios.findById(USUARIO_ID)).thenReturn(Optional.of(responsavel));
+
+        var erro = assertThrows(AuthException.class, () -> service.consultarHistoricoParticipacao(USUARIO_ID));
+
+        assertEquals(HttpStatus.FORBIDDEN, erro.getStatus());
+        verify(inscricoes, never()).findByVoluntarioId(any());
+    }
+
+    @Test
+    void deveExigirUsuarioExistenteEAtivoParaConsultarHistorico() {
+        assertEquals(HttpStatus.UNAUTHORIZED, assertThrows(AuthException.class,
+                () -> service.consultarHistoricoParticipacao(null)).getStatus());
+
+        when(usuarios.findById(USUARIO_ID)).thenReturn(Optional.empty());
+        assertEquals(HttpStatus.FORBIDDEN, assertThrows(AuthException.class,
+                () -> service.consultarHistoricoParticipacao(USUARIO_ID)).getStatus());
+
+        var inativo = new Usuarios();
+        inativo.setId(USUARIO_ID);
+        inativo.setAtivo(false);
+        inativo.setTipoUsuario("VOLUNTARIO");
+        when(usuarios.findById(USUARIO_ID)).thenReturn(Optional.of(inativo));
+        assertEquals(HttpStatus.FORBIDDEN, assertThrows(AuthException.class,
+                () -> service.consultarHistoricoParticipacao(USUARIO_ID)).getStatus());
+
+        verify(inscricoes, never()).findByVoluntarioId(any());
     }
 
     @Test
