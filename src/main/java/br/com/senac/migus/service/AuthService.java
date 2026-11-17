@@ -65,7 +65,7 @@ public class AuthService {
     private String definirTipoUsuario(String email) {
         String dominio = email.substring(email.lastIndexOf('@') + 1);
         boolean emailMigus = dominio.equals("migus") || dominio.startsWith("migus.");
-        return emailMigus ? "responsavel" : "interessado";
+        return emailMigus ? "RESPONSAVEL" : "interessado";
     }
 
     private String normalizarEmail(String email) {

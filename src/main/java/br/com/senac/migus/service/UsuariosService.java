@@ -22,6 +22,23 @@ public class UsuariosService {
         this.usuariosRepository = usuariosRepository;
     }
 
+    public void desativarMinhaConta(String id) {
+        var usuario = usuariosRepository.findById(id)
+                .filter(conta -> Boolean.TRUE.equals(conta.getAtivo()))
+                .orElseThrow(this::contaIndisponivel);
+        String perfil = usuario.getTipoUsuario();
+        if (!"interessado".equalsIgnoreCase(perfil) && !"VOLUNTARIO".equalsIgnoreCase(perfil)) {
+            throw new AuthException("Este perfil não pode desativar a própria conta", HttpStatus.FORBIDDEN);
+        }
+        if (usuariosRepository.desativarParticipante(id, perfil, LocalDate.now()) == 0) {
+            throw contaIndisponivel();
+        }
+    }
+
+    private AuthException contaIndisponivel() {
+        return new AuthException("A conta não está disponível para esta sessão", HttpStatus.UNAUTHORIZED);
+    }
+
     public UsuarioDTO getMeuPerfil(String userId) {
         Usuarios usuario = usuariosRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
@@ -59,7 +76,12 @@ public class UsuariosService {
         }
         usuario.setDataAtualizacao(LocalDate.now());
 
-        Usuarios salvo = usuariosRepository.save(usuario);
-        return UsuarioResponseDTO.comSucesso(salvo);
+        long alterados = usuariosRepository.atualizarDadosPessoais(id, usuario.getNome(), usuario.getEmail(),
+                usuario.getTelefone(), usuario.getDataNascimento(), usuario.getDataAtualizacao());
+        // O Mongo também retorna zero quando os dados já eram iguais.
+        if (alterados == 0 && !usuariosRepository.existsByIdAndAtivoTrue(id)) {
+            throw contaIndisponivel();
+        }
+        return UsuarioResponseDTO.comSucesso(usuario);
     }
 }

@@ -5,6 +5,8 @@ import br.com.senac.migus.dto.UsuarioResponseDTO;
 import br.com.senac.migus.dto.UsuarioUpdateRequestDTO;
 import br.com.senac.migus.service.UsuariosService;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.web.bind.annotation.PatchMapping;
 import java.security.Principal;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -30,6 +32,16 @@ public class UsuariosController {
         String userId = (String) authentication.getPrincipal();
         UsuarioDTO usuario = usuariosService.getMeuPerfil(userId);
         return ResponseEntity.ok(usuario);
+    }
+
+    @PatchMapping("/me/desativar")
+    public ResponseEntity<Void> desativarMinhaConta(Principal principal, HttpServletRequest request,
+                                                     @RequestBody(required = false) byte[] corpo) {
+        if (request.getQueryString() != null || (corpo != null && corpo.length > 0)) {
+            throw new IllegalArgumentException("A desativação não aceita parâmetros nem corpo");
+        }
+        usuariosService.desativarMinhaConta(principal.getName());
+        return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/{id}")
