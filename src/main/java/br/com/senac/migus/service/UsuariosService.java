@@ -35,6 +35,34 @@ public class UsuariosService {
         }
     }
 
+    public UsuarioResponseDTO inativarVoluntario(String voluntarioId, String usuarioAutenticadoId) {
+        if (usuarioAutenticadoId == null) {
+            throw new AuthException("Autenticação necessária", HttpStatus.UNAUTHORIZED);
+        }
+        var responsavel = usuariosRepository.findById(usuarioAutenticadoId)
+                .orElseThrow(() -> new AuthException("Usuário não encontrado", HttpStatus.FORBIDDEN));
+        if (!Boolean.TRUE.equals(responsavel.getAtivo())
+                || !"RESPONSAVEL".equals(responsavel.getTipoUsuario())) {
+            throw new AuthException("Somente um responsável ativo pode inativar cadastros", HttpStatus.FORBIDDEN);
+        }
+        Usuarios voluntario = usuariosRepository.findById(voluntarioId)
+                .orElseThrow(() -> new ResourceNotFoundException("Voluntário não encontrado com o ID: " + voluntarioId));
+        String perfil = voluntario.getTipoUsuario();
+        if (!"interessado".equalsIgnoreCase(perfil) && !"VOLUNTARIO".equalsIgnoreCase(perfil)) {
+            throw new AuthException("Somente cadastros de voluntários podem ser inativados", HttpStatus.FORBIDDEN);
+        }
+        if (!Boolean.TRUE.equals(voluntario.getAtivo())) {
+            throw new AuthException("O cadastro já está inativo", HttpStatus.CONFLICT);
+        }
+        LocalDate hoje = LocalDate.now();
+        if (usuariosRepository.desativarParticipante(voluntarioId, perfil, hoje) == 0) {
+            throw new AuthException("O cadastro já está inativo", HttpStatus.CONFLICT);
+        }
+        voluntario.setAtivo(false);
+        voluntario.setDataAtualizacao(hoje);
+        return new UsuarioResponseDTO("Cadastro inativado com sucesso!", UsuarioDTO.fromEntity(voluntario));
+    }
+
     private AuthException contaIndisponivel() {
         return new AuthException("A conta não está disponível para esta sessão", HttpStatus.UNAUTHORIZED);
     }
