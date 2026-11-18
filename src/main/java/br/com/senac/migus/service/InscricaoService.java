@@ -1,6 +1,7 @@
 package br.com.senac.migus.service;
 
 import br.com.senac.migus.dto.MinhaInscricaoDTO;
+import br.com.senac.migus.dto.HistoricoParticipacaoDTO;
 import br.com.senac.migus.model.Programa;
 import br.com.senac.migus.dto.InscritoDTO;
 import br.com.senac.migus.exception.AuthException;
@@ -14,6 +15,8 @@ import org.bson.types.ObjectId;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -236,5 +239,40 @@ public class InscricaoService {
         return lista.stream()
                 .map(inscricao -> MinhaInscricaoDTO.of(inscricao, porId.get(inscricao.getProgramaId())))
                 .toList();
+    }
+
+    public List<HistoricoParticipacaoDTO> consultarHistoricoParticipacao(String usuarioId) {
+        if (usuarioId == null) {
+            throw new AuthException("Autenticação necessária", HttpStatus.UNAUTHORIZED);
+        }
+        var voluntario = usuarios.findById(usuarioId)
+                .orElseThrow(() -> new AuthException("Usuário não encontrado", HttpStatus.FORBIDDEN));
+        if (!Boolean.TRUE.equals(voluntario.getAtivo())) {
+            throw new AuthException("Somente um usuário ativo pode consultar o histórico", HttpStatus.FORBIDDEN);
+        }
+        String tipo = voluntario.getTipoUsuario();
+        if (!"VOLUNTARIO".equalsIgnoreCase(tipo) && !"INTERESSADO".equalsIgnoreCase(tipo)) {
+            throw new AuthException("Somente voluntários podem consultar o histórico de participação",
+                    HttpStatus.FORBIDDEN);
+        }
+
+        var lista = new ArrayList<>(inscricoes.findByVoluntarioId(usuarioId));
+        if (lista.isEmpty()) return List.of();
+
+        lista.sort(Comparator.comparing(this::dataMaisRecente,
+                Comparator.nullsLast(Comparator.reverseOrder())));
+
+        Map<String, Programa> porId = programas.findAllById(
+                        lista.stream().map(Inscricao::getProgramaId).distinct().toList())
+                .stream().collect(Collectors.toMap(Programa::getId, Function.identity()));
+        return lista.stream()
+                .map(inscricao -> HistoricoParticipacaoDTO.of(inscricao, porId.get(inscricao.getProgramaId())))
+                .toList();
+    }
+
+    private Date dataMaisRecente(Inscricao inscricao) {
+        return inscricao.getDataAtualizacao() != null
+                ? inscricao.getDataAtualizacao()
+                : inscricao.getDataInscricao();
     }
 }
