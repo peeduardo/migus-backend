@@ -252,6 +252,132 @@ class ProgramaControllerTest {
         verify(usuarios, never()).save(any());
     }
 
+    // --- C12 / RF05: editar programa ---
+
+    private static final String PROGRAMA_ID = "507f1f77bcf86cd799439022";
+    private static final String EDICAO = """
+            {"nome":"Apoio escolar","descricao":"Reforço para crianças","categoria":["Educação","Inclusão"],
+             "diasDisponiveis":["terça","quinta"],"horarioInicio":"14:00","horarioFim":"17:00","ativo":false}
+            """;
+
+    private Programa programaExistente(String responsavelId) {
+        return new Programa(PROGRAMA_ID, "Apoio", "Apoio à comunidade",
+                java.util.List.of("Educação"), java.util.List.of("segunda"), "09:00", "12:00", true,
+                responsavelId, new java.util.Date(0), null);
+    }
+
+    @Test
+    void deveEditarProgramaExistenteEPersistirAsAlteracoes() throws Exception {
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.of(programaExistente(USUARIO_ID)));
+
+        mvc.perform(put("/api/programas/" + PROGRAMA_ID).header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content(EDICAO))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(PROGRAMA_ID))
+                .andExpect(jsonPath("$.nome").value("Apoio escolar"))
+                .andExpect(jsonPath("$.descricao").value("Reforço para crianças"))
+                .andExpect(jsonPath("$.categoria.length()").value(2))
+                .andExpect(jsonPath("$.diasDisponiveis[1]").value("quinta"))
+                .andExpect(jsonPath("$.horarioInicio").value("14:00"))
+                .andExpect(jsonPath("$.horarioFim").value("17:00"))
+                .andExpect(jsonPath("$.ativo").value(false))
+                .andExpect(jsonPath("$.responsavelId").value(USUARIO_ID))
+                .andExpect(jsonPath("$.dataAtualizacao").isNotEmpty());
+
+        var salvo = org.mockito.ArgumentCaptor.forClass(Programa.class);
+        verify(programas).save(salvo.capture());
+        org.junit.jupiter.api.Assertions.assertEquals(PROGRAMA_ID, salvo.getValue().getId());
+        org.junit.jupiter.api.Assertions.assertEquals("Apoio escolar", salvo.getValue().getNome());
+        org.junit.jupiter.api.Assertions.assertEquals(USUARIO_ID, salvo.getValue().getResponsavelId());
+        org.junit.jupiter.api.Assertions.assertEquals(new java.util.Date(0), salvo.getValue().getDataCadastro());
+        org.junit.jupiter.api.Assertions.assertNotNull(salvo.getValue().getDataAtualizacao());
+    }
+
+    @Test
+    void naoDeveAlterarIdResponsavelOuCadastroEnviadosNaEdicao() throws Exception {
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.of(programaExistente(USUARIO_ID)));
+        var json = (ObjectNode) new JsonMapper().readTree(EDICAO);
+        json.put("id", "507f1f77bcf86cd799439098");
+        json.put("responsavelId", "507f1f77bcf86cd799439099");
+        json.put("dataCadastro", "2000-01-01");
+
+        mvc.perform(put("/api/programas/" + PROGRAMA_ID).header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content(json.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(PROGRAMA_ID))
+                .andExpect(jsonPath("$.responsavelId").value(USUARIO_ID));
+    }
+
+    @Test
+    void deveRetornar404AoEditarProgramaInexistente() throws Exception {
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.empty());
+
+        mvc.perform(put("/api/programas/" + PROGRAMA_ID).header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content(EDICAO))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.message").value("Programa não encontrado com o ID: " + PROGRAMA_ID));
+        verify(programas, never()).save(any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"nome", "descricao", "categoria", "diasDisponiveis", "horarioInicio", "horarioFim", "ativo"})
+    void deveRejeitarEdicaoComCampoAusente(String campo) throws Exception {
+        var json = (ObjectNode) new JsonMapper().readTree(EDICAO);
+        json.remove(campo);
+        conferirEdicaoInvalida(json.toString());
+    }
+
+    @Test
+    void deveRejeitarEdicaoComDadosInvalidos() throws Exception {
+        conferirEdicaoInvalida("{");
+        conferirEdicaoInvalida(EDICAO.replace("\"nome\":\"Apoio escolar\"", "\"nome\":\"   \""));
+        conferirEdicaoInvalida(EDICAO.replace("[\"terça\",\"quinta\"]", "[]"));
+        conferirEdicaoInvalida(EDICAO.replace("\"ativo\":false", "\"ativo\":\"invalido\""));
+    }
+
+    private void conferirEdicaoInvalida(String json) throws Exception {
+        mvc.perform(put("/api/programas/" + PROGRAMA_ID).header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content(json))
+                .andExpect(status().isBadRequest());
+        verify(programas, never()).findById(any());
+        verify(programas, never()).save(any());
+    }
+
+    @Test
+    void deveImpedirEdicaoDeProgramaDeOutroResponsavel() throws Exception {
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.of(programaExistente("507f1f77bcf86cd799439099")));
+
+        mvc.perform(put("/api/programas/" + PROGRAMA_ID).header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content(EDICAO))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("Somente o responsável pelo programa pode editá-lo"));
+        verify(programas, never()).save(any());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"interessado", "VOLUNTARIO"})
+    void deveImpedirEdicaoPorPerfilSemPermissao(String perfil) throws Exception {
+        usuarios.findById(USUARIO_ID).orElseThrow().setTipoUsuario(perfil);
+
+        mvc.perform(put("/api/programas/" + PROGRAMA_ID).header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content(EDICAO))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("Somente um responsável ativo pode editar programas"));
+        verify(programas, never()).save(any());
+    }
+
+    @Test
+    void deveImpedirEdicaoSemTokenOuComTokenInvalido() throws Exception {
+        mvc.perform(put("/api/programas/" + PROGRAMA_ID)
+                        .contentType(MediaType.APPLICATION_JSON).content(EDICAO))
+                .andExpect(status().isForbidden());
+        mvc.perform(put("/api/programas/" + PROGRAMA_ID).header("Authorization", "Bearer token-invalido")
+                        .contentType(MediaType.APPLICATION_JSON).content(EDICAO))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(programas);
+    }
+
     private static final String DESATIVAR = "/api/usuarios/me/desativar";
 
     @ParameterizedTest

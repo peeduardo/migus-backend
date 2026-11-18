@@ -156,6 +156,86 @@ class ProgramaServiceTest {
                 assertThrows(AuthException.class, () -> service().alterarDisponibilidade("p", true, "u")).getStatus());
     }
 
+    // --- editar ---
+
+    private ProgramaRequestDTO pedidoEdicao() {
+        return new ProgramaRequestDTO("Novo nome", "Nova descrição", List.of("Saúde"),
+                List.of("terça", "quinta"), "10:00", "16:00", false);
+    }
+
+    @Test
+    void deveEditarProgramaPreservandoIdResponsavelEDataDeCadastro() {
+        when(usuarios.findById("resp-1")).thenReturn(Optional.of(responsavel("resp-1", "RESPONSAVEL", true)));
+        var original = programa("prog-1", "resp-1");
+        when(programas.findById("prog-1")).thenReturn(Optional.of(original));
+        when(programas.save(any())).thenAnswer(call -> call.getArgument(0));
+        var inicio = new Date();
+
+        var resultado = service().editar("prog-1", pedidoEdicao(), "resp-1");
+
+        assertEquals("prog-1", resultado.getId());
+        assertEquals("resp-1", resultado.getResponsavelId());
+        assertEquals(original.getDataCadastro(), resultado.getDataCadastro());
+        assertEquals("Novo nome", resultado.getNome());
+        assertEquals("Nova descrição", resultado.getDescricao());
+        assertEquals(List.of("Saúde"), resultado.getCategoria());
+        assertEquals(List.of("terça", "quinta"), resultado.getDiasDisponiveis());
+        assertEquals("10:00", resultado.getHorarioInicio());
+        assertEquals("16:00", resultado.getHorarioFim());
+        assertFalse(resultado.getAtivo());
+        assertNotNull(resultado.getDataAtualizacao());
+        assertFalse(resultado.getDataAtualizacao().before(inicio));
+        verify(programas).save(resultado);
+    }
+
+    @Test
+    void deveBloquearEdicaoSemAutenticacao() {
+        assertEquals(HttpStatus.UNAUTHORIZED,
+                assertThrows(AuthException.class, () -> service().editar("p", pedidoEdicao(), null)).getStatus());
+        verifyNoInteractions(programas);
+    }
+
+    @Test
+    void deveBloquearEdicaoDeUsuarioInexistente() {
+        when(usuarios.findById("u")).thenReturn(Optional.empty());
+        assertEquals(HttpStatus.FORBIDDEN,
+                assertThrows(AuthException.class, () -> service().editar("p", pedidoEdicao(), "u")).getStatus());
+        verify(programas, never()).save(any());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"interessado,true", "VOLUNTARIO,true", "RESPONSAVEL,false"})
+    void deveBloquearEdicaoDePerfilSemPermissao(String perfil, boolean ativo) {
+        when(usuarios.findById("u")).thenReturn(Optional.of(responsavel("u", perfil, ativo)));
+        assertEquals(HttpStatus.FORBIDDEN,
+                assertThrows(AuthException.class, () -> service().editar("p", pedidoEdicao(), "u")).getStatus());
+        verify(programas, never()).findById(any());
+        verify(programas, never()).save(any());
+    }
+
+    @Test
+    void deveTratarEdicaoDeProgramaInexistente() {
+        when(usuarios.findById("u")).thenReturn(Optional.of(responsavel("u", "RESPONSAVEL", true)));
+        when(programas.findById("inexistente")).thenReturn(Optional.empty());
+
+        var erro = assertThrows(br.com.senac.migus.exception.ResourceNotFoundException.class,
+                () -> service().editar("inexistente", pedidoEdicao(), "u"));
+
+        assertEquals("Programa não encontrado com o ID: inexistente", erro.getMessage());
+        verify(programas, never()).save(any());
+    }
+
+    @Test
+    void deveBloquearEdicaoDeProgramaDeOutroResponsavel() {
+        when(usuarios.findById("u")).thenReturn(Optional.of(responsavel("u", "RESPONSAVEL", true)));
+        when(programas.findById("prog-1")).thenReturn(Optional.of(programa("prog-1", "outro-responsavel")));
+
+        var erro = assertThrows(AuthException.class, () -> service().editar("prog-1", pedidoEdicao(), "u"));
+
+        assertEquals(HttpStatus.FORBIDDEN, erro.getStatus());
+        verify(programas, never()).save(any());
+    }
+
     // --- listarMeusProgramas ---
 
     @Test

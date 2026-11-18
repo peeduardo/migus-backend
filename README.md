@@ -70,3 +70,23 @@ Teste de integração com MongoDB (opcional): defina `MONGODB_TEST_URI` apontand
 ./mvnw -B -ntp "-Dtest=ProgramaMongoIT" test
 ```
 
+Novos cadastros enquadrados na regra de domínio existente gravam `RESPONSAVEL`, como esperado pelo cadastro de programas e pela interface. Contas antigas não foram alteradas. Após essa correção, `clean verify` passou com 89 testes. A conferência manual feita pelo autor com frontend, backend e banco reais confirmou os três estados, isolamento entre contas, lista vazia, programa inativo e programa indisponível, em desktop e celular emulado de 393 px. A navegação por teclado foi conferida anteriormente na prévia simulada, separadamente. Ao encerrar a demonstração, foram removidas pelos IDs as 5 inscrições (incluindo a inscrição adicional), os 2 programas fictícios restantes e as 4 contas, com ausência confirmada. O Programa Amigos Legais e suas demais inscrições foram preservados; `migus_testes` não foi acessado na limpeza.
+
+## C12 — RF05: Editar programa
+
+`PUT /api/programas/{id}`, com o JWT no cabeçalho `Authorization: Bearer <token>`.
+O corpo é o mesmo do cadastro (`nome`, `descricao`, `categoria`, `diasDisponiveis`,
+`horarioInicio`, `horarioFim`, `ativo`), com as mesmas validações. Os dados atuais
+são consultados pelo `GET /api/programas/{id}` já existente.
+
+Somente o responsável ativo que cadastrou o programa pode editá-lo. O servidor
+preserva ID, responsável e data de cadastro e define `dataAtualizacao`; campos
+de ID, responsável ou auditoria enviados pelo cliente não são usados.
+
+Respostas: 200 com o programa atualizado; 400 para dados inválidos; 403 para JWT
+ausente/inválido, perfil sem permissão ou programa de outro responsável; 404
+quando o programa não existe.
+
+Os testes de `ProgramaServiceTest` e `ProgramaControllerTest` usam repositories
+simulados e conferem o objeto enviado ao `save`. Eles não comprovam persistência
+real no MongoDB; para isso, valide com a aplicação conectada ao banco de testes.
