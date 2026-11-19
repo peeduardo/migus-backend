@@ -1,5 +1,7 @@
 package br.com.senac.migus.controller;
 
+import br.com.senac.migus.dto.DecisaoRequestDTO;
+import br.com.senac.migus.dto.InscricaoRequestDTO;
 import br.com.senac.migus.dto.InscritoDTO;
 import br.com.senac.migus.dto.TransferenciaRequestDTO;
 import br.com.senac.migus.model.Inscricao;
@@ -22,32 +24,41 @@ public class InscricaoController {
     }
 
     @PostMapping
-    public ResponseEntity<Inscricao> inscrever(@PathVariable String programaId, Principal principal) {
-        var inscricao = inscricoes.inscrever(programaId, principal == null ? null : principal.getName());
+    public ResponseEntity<Inscricao> inscrever(@PathVariable String programaId,
+                                               @Valid @RequestBody(required = false) InscricaoRequestDTO request,
+                                               Principal principal) {
+        var inscricao = inscricoes.inscrever(programaId, principal == null ? null : principal.getName(),
+                request == null ? null : request.mensagem());
         return ResponseEntity.status(HttpStatus.CREATED).body(inscricao);
     }
 
     @PatchMapping("/{inscricaoId}/aprovar")
     public ResponseEntity<Inscricao> aprovar(@PathVariable String programaId, @PathVariable String inscricaoId,
+                                            @Valid @RequestBody(required = false) DecisaoRequestDTO request,
                                             Principal principal) {
         return ResponseEntity.ok(inscricoes.aprovar(programaId, inscricaoId,
-                principal == null ? null : principal.getName()));
+                principal == null ? null : principal.getName(),
+                request == null ? null : request.recado()));
     }
 
     @PatchMapping("/{inscricaoId}/recusar")
     public ResponseEntity<Inscricao> recusar(@PathVariable String programaId, @PathVariable String inscricaoId,
+                                            @Valid @RequestBody(required = false) DecisaoRequestDTO request,
                                             Principal principal) {
         return ResponseEntity.ok(inscricoes.recusar(programaId, inscricaoId,
-                principal == null ? null : principal.getName()));
+                principal == null ? null : principal.getName(),
+                request == null ? null : request.recado()));
     }
 
     @PatchMapping("/{inscricaoId}/saida")
     public ResponseEntity<Inscricao> registrarSaida(
             @PathVariable String programaId,
             @PathVariable String inscricaoId,
+            @Valid @RequestBody(required = false) DecisaoRequestDTO request,
             Principal principal) {
         return ResponseEntity.ok(inscricoes.registrarSaida(programaId, inscricaoId,
-                principal == null ? null : principal.getName()));
+                principal == null ? null : principal.getName(),
+                request == null ? null : request.recado()));
     }
 
     @PostMapping("/{inscricaoId}/transferir")
@@ -57,7 +68,7 @@ public class InscricaoController {
             @Valid @RequestBody TransferenciaRequestDTO request,
             Principal principal) {
         var novaInscricao = inscricoes.transferir(inscricaoId, request.programaDestinoId(),
-                principal == null ? null : principal.getName());
+                principal == null ? null : principal.getName(), request.recado());
         return ResponseEntity.status(HttpStatus.CREATED).body(novaInscricao);
     }
 

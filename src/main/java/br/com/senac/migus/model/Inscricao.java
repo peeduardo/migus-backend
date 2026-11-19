@@ -21,6 +21,8 @@ public class Inscricao {
     private Date dataRecusa;
     private Date dataAtualizacao;
     private Date dataSaida;
+    private String mensagem;
+    private String recado;
 
     public Inscricao(String id, String voluntarioId, String programaId, String status, Date dataInscricao,
                      Date dataAprovacao, Date dataRecusa, Date dataAtualizacao) {
@@ -61,6 +63,22 @@ public class Inscricao {
 
     public Date getDataSaida() {
         return dataSaida;
+    }
+
+    public String getMensagem() {
+        return mensagem;
+    }
+
+    public String getRecado() {
+        return recado;
+    }
+
+    public void setMensagem(String mensagem) {
+        this.mensagem = mensagem;
+    }
+
+    public void setRecado(String recado) {
+        this.recado = recado;
     }
 
     public void sair(Date data) {
