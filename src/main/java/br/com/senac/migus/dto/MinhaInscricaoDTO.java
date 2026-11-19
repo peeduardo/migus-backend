@@ -9,11 +9,14 @@ public record MinhaInscricaoDTO(
         String programaId,
         String programaNome,
         Date dataInscricao,
-        String status
+        String status,
+        String mensagem,
+        String recado
 ) {
     public static MinhaInscricaoDTO of(Inscricao inscricao, Programa programa) {
         return new MinhaInscricaoDTO(inscricao.getId(), inscricao.getProgramaId(),
                 programa == null ? null : programa.getNome(),
-                inscricao.getDataInscricao(), inscricao.getStatus());
+                inscricao.getDataInscricao(), inscricao.getStatus(),
+                inscricao.getMensagem(), inscricao.getRecado());
     }
 }

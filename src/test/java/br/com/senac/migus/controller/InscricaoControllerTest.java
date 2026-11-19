@@ -94,6 +94,64 @@ class InscricaoControllerTest {
     }
 
     @Test
+    void deveSalvarMensagemDoVoluntarioAoInscrever() throws Exception {
+        when(inscricoes.existsByVoluntarioIdAndProgramaId(any(), any())).thenReturn(false);
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.of(
+                br.com.senac.migus.ControllerTestHelper.programaAtivo(PROGRAMA_ID, USUARIO_ID)));
+
+        mvc.perform(post("/api/programas/{pId}/inscricoes", PROGRAMA_ID)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"mensagem\":\"Quero ajudar a comunidade\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.mensagem").value("Quero ajudar a comunidade"));
+    }
+
+    @Test
+    void deveSalvarRecadoAoRecusarInscricao() throws Exception {
+        var responsavel = new Usuarios();
+        responsavel.setId(USUARIO_ID);
+        responsavel.setTipoUsuario("RESPONSAVEL");
+        responsavel.setAtivo(true);
+        when(usuarios.findById(USUARIO_ID)).thenReturn(Optional.of(responsavel));
+        var inscricao = new Inscricao(INSCRICAO_ID, "voluntario-id", PROGRAMA_ID, "PENDENTE",
+                new Date(), null, null, null);
+        when(inscricoes.findById(INSCRICAO_ID)).thenReturn(Optional.of(inscricao));
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.of(
+                br.com.senac.migus.ControllerTestHelper.programaAtivo(PROGRAMA_ID, USUARIO_ID)));
+
+        mvc.perform(patch("/api/programas/{pId}/inscricoes/{iId}/recusar", PROGRAMA_ID, INSCRICAO_ID)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"recado\":\"Vagas preenchidas\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RECUSADA"))
+                .andExpect(jsonPath("$.recado").value("Vagas preenchidas"));
+    }
+
+    @Test
+    void deveSalvarRecadoAoAprovarInscricao() throws Exception {
+        var responsavel = new Usuarios();
+        responsavel.setId(USUARIO_ID);
+        responsavel.setTipoUsuario("RESPONSAVEL");
+        responsavel.setAtivo(true);
+        when(usuarios.findById(USUARIO_ID)).thenReturn(Optional.of(responsavel));
+        var inscricao = new Inscricao(INSCRICAO_ID, "voluntario-id", PROGRAMA_ID, "PENDENTE",
+                new Date(), null, null, null);
+        when(inscricoes.findById(INSCRICAO_ID)).thenReturn(Optional.of(inscricao));
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.of(
+                br.com.senac.migus.ControllerTestHelper.programaAtivo(PROGRAMA_ID, USUARIO_ID)));
+
+        mvc.perform(patch("/api/programas/{pId}/inscricoes/{iId}/aprovar", PROGRAMA_ID, INSCRICAO_ID)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"recado\":\"Bem-vindo!\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("APROVADA"))
+                .andExpect(jsonPath("$.recado").value("Bem-vindo!"));
+    }
+
+    @Test
     void deveBloquearInscricaoSemToken() throws Exception {
         mvc.perform(post("/api/programas/{pId}/inscricoes", PROGRAMA_ID))
                 .andExpect(status().is4xxClientError());
@@ -167,7 +225,7 @@ class InscricaoControllerTest {
                 br.com.senac.migus.ControllerTestHelper.programaAtivo(PROGRAMA_ID, USUARIO_ID)));
 
         var inscrito = new InscritoDTO(INSCRICAO_ID, "APROVADA", new Date(),
-                USUARIO_ID, "Ana", "ana@exemplo.com", "11999999999", true);
+                USUARIO_ID, "Ana", "ana@exemplo.com", "11999999999", true, null, null);
         when(inscricoes.findByProgramaIdAndStatus(eq(PROGRAMA_ID), eq("APROVADA")))
                 .thenReturn(List.of(new Inscricao(INSCRICAO_ID, USUARIO_ID, PROGRAMA_ID, "APROVADA",
                         new Date(), new Date(), null, null)));

@@ -54,7 +54,7 @@ class InscricaoServiceTest {
 
     @Test
     void deveCriarInscricaoPendente() {
-        var inscricao = service.inscrever(PROGRAMA_ID, USUARIO_ID);
+        var inscricao = service.inscrever(PROGRAMA_ID, USUARIO_ID, null);
 
         assertEquals(USUARIO_ID, inscricao.getVoluntarioId());
         assertEquals(PROGRAMA_ID, inscricao.getProgramaId());
@@ -68,7 +68,7 @@ class InscricaoServiceTest {
 
     @Test
     void deveExigirAutenticacao() {
-        var erro = assertThrows(AuthException.class, () -> service.inscrever(PROGRAMA_ID, null));
+        var erro = assertThrows(AuthException.class, () -> service.inscrever(PROGRAMA_ID, null, null));
         assertEquals(HttpStatus.UNAUTHORIZED, erro.getStatus());
     }
 
@@ -79,7 +79,7 @@ class InscricaoServiceTest {
         usuario.setAtivo(false);
         when(usuarios.findById(USUARIO_ID)).thenReturn(Optional.of(usuario));
 
-        var erro = assertThrows(AuthException.class, () -> service.inscrever(PROGRAMA_ID, USUARIO_ID));
+        var erro = assertThrows(AuthException.class, () -> service.inscrever(PROGRAMA_ID, USUARIO_ID, null));
         assertEquals(HttpStatus.FORBIDDEN, erro.getStatus());
         verify(inscricoes, never()).save(any());
     }
@@ -87,15 +87,15 @@ class InscricaoServiceTest {
     @Test
     void deveFalharQuandoProgramaNaoExiste() {
         when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.empty());
-        assertThrows(ResourceNotFoundException.class, () -> service.inscrever(PROGRAMA_ID, USUARIO_ID));
-        assertThrows(ResourceNotFoundException.class, () -> service.inscrever("invalido", USUARIO_ID));
+        assertThrows(ResourceNotFoundException.class, () -> service.inscrever(PROGRAMA_ID, USUARIO_ID, null));
+        assertThrows(ResourceNotFoundException.class, () -> service.inscrever("invalido", USUARIO_ID, null));
         verify(inscricoes, never()).save(any());
     }
 
     @Test
     void deveRejeitarProgramaInativo() {
         when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.of(programa(false)));
-        assertThrows(IllegalArgumentException.class, () -> service.inscrever(PROGRAMA_ID, USUARIO_ID));
+        assertThrows(IllegalArgumentException.class, () -> service.inscrever(PROGRAMA_ID, USUARIO_ID, null));
         verify(inscricoes, never()).save(any());
     }
 
@@ -216,7 +216,7 @@ class InscricaoServiceTest {
         programaDoResponsavel(RESPONSAVEL_ID);
         inscricaoPendente();
 
-        var inscricao = service.aprovar(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID);
+        var inscricao = service.aprovar(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID, null);
 
         assertEquals("APROVADA", inscricao.getStatus());
         assertNotNull(inscricao.getDataAprovacao());
@@ -231,7 +231,7 @@ class InscricaoServiceTest {
         programaDoResponsavel(RESPONSAVEL_ID);
         inscricaoPendente();
 
-        var inscricao = service.recusar(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID);
+        var inscricao = service.recusar(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID, null);
 
         assertEquals("RECUSADA", inscricao.getStatus());
         assertNotNull(inscricao.getDataRecusa());
@@ -247,9 +247,9 @@ class InscricaoServiceTest {
         programaDoResponsavel(RESPONSAVEL_ID);
         inscricaoPendente();
         assertEquals(HttpStatus.FORBIDDEN, assertThrows(AuthException.class,
-                () -> service.aprovar(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID)).getStatus());
+                () -> service.aprovar(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID, null)).getStatus());
         assertEquals(HttpStatus.UNAUTHORIZED, assertThrows(AuthException.class,
-                () -> service.recusar(PROGRAMA_ID, INSCRICAO_ID, null)).getStatus());
+                () -> service.recusar(PROGRAMA_ID, INSCRICAO_ID, null, null)).getStatus());
         verify(inscricoes, never()).save(any());
     }
 
@@ -259,7 +259,7 @@ class InscricaoServiceTest {
         programaDoResponsavel("507f1f77bcf86cd799439099");
         inscricaoPendente();
         assertEquals(HttpStatus.FORBIDDEN, assertThrows(AuthException.class,
-                () -> service.aprovar(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID)).getStatus());
+                () -> service.aprovar(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID, null)).getStatus());
         verify(inscricoes, never()).save(any());
     }
 
@@ -269,7 +269,7 @@ class InscricaoServiceTest {
         programaDoResponsavel(RESPONSAVEL_ID);
         inscricaoPendente().aprovar(new Date());
         assertEquals(HttpStatus.CONFLICT, assertThrows(AuthException.class,
-                () -> service.recusar(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID)).getStatus());
+                () -> service.recusar(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID, null)).getStatus());
         verify(inscricoes, never()).save(any());
     }
 
@@ -279,13 +279,13 @@ class InscricaoServiceTest {
         programaDoResponsavel(RESPONSAVEL_ID);
         when(inscricoes.findById(INSCRICAO_ID)).thenReturn(Optional.empty());
         assertThrows(ResourceNotFoundException.class,
-                () -> service.aprovar(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID));
+                () -> service.aprovar(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID, null));
         assertThrows(ResourceNotFoundException.class,
-                () -> service.aprovar(PROGRAMA_ID, "invalido", RESPONSAVEL_ID));
+                () -> service.aprovar(PROGRAMA_ID, "invalido", RESPONSAVEL_ID, null));
         when(inscricoes.findById(INSCRICAO_ID)).thenReturn(Optional.of(new Inscricao(INSCRICAO_ID, USUARIO_ID,
                 "507f1f77bcf86cd799439055", "PENDENTE", new Date(), null, null, null)));
         assertThrows(ResourceNotFoundException.class,
-                () -> service.aprovar(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID));
+                () -> service.aprovar(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID, null));
         verify(inscricoes, never()).save(any());
     }
 
@@ -293,7 +293,7 @@ class InscricaoServiceTest {
     @Test
     void deveRejeitarInscricaoDuplicada() {
         when(inscricoes.existsByVoluntarioIdAndProgramaId(USUARIO_ID, PROGRAMA_ID)).thenReturn(true);
-        var erro = assertThrows(AuthException.class, () -> service.inscrever(PROGRAMA_ID, USUARIO_ID));
+        var erro = assertThrows(AuthException.class, () -> service.inscrever(PROGRAMA_ID, USUARIO_ID, null));
         assertEquals(HttpStatus.CONFLICT, erro.getStatus());
         verify(inscricoes, never()).save(any());
     }
@@ -310,7 +310,7 @@ class InscricaoServiceTest {
         when(inscricoes.findById(INSCRICAO_ID)).thenReturn(Optional.of(inscricao));
         when(inscricoes.save(any())).thenAnswer(call -> call.getArgument(0));
 
-        var resultado = service.registrarSaida(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID);
+        var resultado = service.registrarSaida(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID, null);
 
         assertEquals("SAIDA", resultado.getStatus());
         assertNotNull(resultado.getDataSaida());
@@ -327,7 +327,7 @@ class InscricaoServiceTest {
         when(inscricoes.findById(INSCRICAO_ID)).thenReturn(Optional.of(inscricao));
 
         assertEquals(HttpStatus.CONFLICT, assertThrows(AuthException.class,
-                () -> service.registrarSaida(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID)).getStatus());
+                () -> service.registrarSaida(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID, null)).getStatus());
         verify(inscricoes, never()).save(any());
     }
 
@@ -341,7 +341,7 @@ class InscricaoServiceTest {
         when(inscricoes.findById(INSCRICAO_ID)).thenReturn(Optional.of(inscricao));
 
         assertEquals(HttpStatus.CONFLICT, assertThrows(AuthException.class,
-                () -> service.registrarSaida(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID)).getStatus());
+                () -> service.registrarSaida(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID, null)).getStatus());
     }
 
     @Test
@@ -351,7 +351,7 @@ class InscricaoServiceTest {
                 new Programa(PROGRAMA_ID, "P", "D", null, null, "09:00", "18:00", true, "outro-resp", new Date(), null)));
 
         assertEquals(HttpStatus.FORBIDDEN, assertThrows(AuthException.class,
-                () -> service.registrarSaida(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID)).getStatus());
+                () -> service.registrarSaida(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID, null)).getStatus());
     }
 
     @Test
@@ -362,7 +362,7 @@ class InscricaoServiceTest {
         when(inscricoes.findById(INSCRICAO_ID)).thenReturn(Optional.empty());
 
         assertThrows(br.com.senac.migus.exception.ResourceNotFoundException.class,
-                () -> service.registrarSaida(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID));
+                () -> service.registrarSaida(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID, null));
     }
 
     // --- transferir branches ---
@@ -375,7 +375,7 @@ class InscricaoServiceTest {
         when(inscricoes.findById(INSCRICAO_ID)).thenReturn(Optional.of(inscricao));
 
         assertEquals(HttpStatus.CONFLICT, assertThrows(AuthException.class,
-                () -> service.transferir(INSCRICAO_ID, "destino-id", RESPONSAVEL_ID)).getStatus());
+                () -> service.transferir(INSCRICAO_ID, "destino-id", RESPONSAVEL_ID, null)).getStatus());
     }
 
     @Test
@@ -388,7 +388,7 @@ class InscricaoServiceTest {
                 new Programa(PROGRAMA_ID, "P", "D", null, null, "09:00", "18:00", true, "outro-resp", new Date(), null)));
 
         assertEquals(HttpStatus.FORBIDDEN, assertThrows(AuthException.class,
-                () -> service.transferir(INSCRICAO_ID, "destino-id", RESPONSAVEL_ID)).getStatus());
+                () -> service.transferir(INSCRICAO_ID, "destino-id", RESPONSAVEL_ID, null)).getStatus());
     }
 
     @Test
@@ -401,7 +401,7 @@ class InscricaoServiceTest {
                 new Programa(PROGRAMA_ID, "P", "D", null, null, "09:00", "18:00", true, RESPONSAVEL_ID, new Date(), null)));
 
         assertThrows(IllegalArgumentException.class,
-                () -> service.transferir(INSCRICAO_ID, PROGRAMA_ID, RESPONSAVEL_ID));
+                () -> service.transferir(INSCRICAO_ID, PROGRAMA_ID, RESPONSAVEL_ID, null));
     }
 
     @Test
@@ -417,7 +417,7 @@ class InscricaoServiceTest {
                 new Programa(DESTINO_ID, "P2", "D2", null, null, "09:00", "18:00", false, "resp2", new Date(), null)));
 
         assertThrows(IllegalArgumentException.class,
-                () -> service.transferir(INSCRICAO_ID, DESTINO_ID, RESPONSAVEL_ID));
+                () -> service.transferir(INSCRICAO_ID, DESTINO_ID, RESPONSAVEL_ID, null));
     }
 
     @Test
@@ -434,7 +434,7 @@ class InscricaoServiceTest {
         when(inscricoes.existsByVoluntarioIdAndProgramaId(USUARIO_ID, DESTINO_ID)).thenReturn(true);
 
         assertEquals(HttpStatus.CONFLICT, assertThrows(AuthException.class,
-                () -> service.transferir(INSCRICAO_ID, DESTINO_ID, RESPONSAVEL_ID)).getStatus());
+                () -> service.transferir(INSCRICAO_ID, DESTINO_ID, RESPONSAVEL_ID, null)).getStatus());
     }
 
     @Test

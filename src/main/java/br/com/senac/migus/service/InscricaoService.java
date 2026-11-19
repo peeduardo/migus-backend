@@ -38,7 +38,7 @@ public class InscricaoService {
         this.usuarios = usuarios;
     }
 
-    public Inscricao inscrever(String programaId, String usuarioId) {
+    public Inscricao inscrever(String programaId, String usuarioId, String mensagem) {
         if (usuarioId == null) {
             throw new AuthException("Autenticação necessária", HttpStatus.UNAUTHORIZED);
         }
@@ -63,18 +63,21 @@ public class InscricaoService {
         }
         var inscricao = new Inscricao(new ObjectId().toHexString(), voluntario.getId(), programa.getId(),
                 STATUS_PENDENTE, new Date(), null, null, null);
+        inscricao.setMensagem(mensagem);
         return inscricoes.save(inscricao);
     }
 
-    public Inscricao aprovar(String programaId, String inscricaoId, String usuarioId) {
+    public Inscricao aprovar(String programaId, String inscricaoId, String usuarioId, String recado) {
         var inscricao = buscarPendenteDoResponsavel(programaId, inscricaoId, usuarioId);
         inscricao.aprovar(new Date());
+        inscricao.setRecado(recado);
         return inscricoes.save(inscricao);
     }
 
-    public Inscricao recusar(String programaId, String inscricaoId, String usuarioId) {
+    public Inscricao recusar(String programaId, String inscricaoId, String usuarioId, String recado) {
         var inscricao = buscarPendenteDoResponsavel(programaId, inscricaoId, usuarioId);
         inscricao.recusar(new Date());
+        inscricao.setRecado(recado);
         return inscricoes.save(inscricao);
     }
 
@@ -115,7 +118,7 @@ public class InscricaoService {
     public static final String STATUS_APROVADA = "APROVADA";
     public static final String STATUS_TRANSFERIDA = "TRANSFERIDA";
 
-    public Inscricao transferir(String inscricaoId, String programaDestinoId, String usuarioId) {
+    public Inscricao transferir(String inscricaoId, String programaDestinoId, String usuarioId, String recado) {
         var responsavel = exigirResponsavelAtivo(usuarioId, "Somente um responsável ativo pode transferir voluntários");
 
         if (!ObjectId.isValid(inscricaoId)) {
@@ -156,18 +159,20 @@ public class InscricaoService {
 
         var agora = new Date();
         inscricaoOrigem.transferir(agora);
+        inscricaoOrigem.setRecado(recado);
         inscricoes.save(inscricaoOrigem);
 
         var novaInscricao = new Inscricao(new ObjectId().toHexString(),
                 inscricaoOrigem.getVoluntarioId(), programaDestinoId,
                 STATUS_APROVADA, agora, agora, null, agora);
+        novaInscricao.setRecado(recado);
         return inscricoes.save(novaInscricao);
     }
 
 
     public static final String STATUS_SAIDA = "SAIDA";
 
-    public Inscricao registrarSaida(String programaId, String inscricaoId, String usuarioId) {
+    public Inscricao registrarSaida(String programaId, String inscricaoId, String usuarioId, String recado) {
         var responsavel = exigirResponsavelAtivo(usuarioId,
                 "Somente um responsável ativo pode registrar a saída de um voluntário");
 
@@ -197,6 +202,7 @@ public class InscricaoService {
         }
 
         inscricao.sair(new Date());
+        inscricao.setRecado(recado);
         return inscricoes.save(inscricao);
     }
     public List<InscritoDTO> listarInscritos(String programaId, String status, String usuarioId) {
