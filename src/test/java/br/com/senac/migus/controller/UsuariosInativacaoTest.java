@@ -4,6 +4,8 @@ import br.com.senac.migus.config.CorsConfig;
 import br.com.senac.migus.config.SecurityConfig;
 import br.com.senac.migus.exception.GlobalExceptionHandler;
 import br.com.senac.migus.model.Usuarios;
+import br.com.senac.migus.repository.InscricaoRepository;
+import br.com.senac.migus.repository.ProgramaRepository;
 import br.com.senac.migus.repository.UsuariosRepository;
 import br.com.senac.migus.service.JwtService;
 import br.com.senac.migus.service.UsuariosService;
@@ -187,6 +189,16 @@ class UsuariosInativacaoTest {
         @Bean
         UsuariosRepository usuariosRepository() {
             return mock(UsuariosRepository.class);
+        }
+
+        @Bean
+        InscricaoRepository inscricaoRepository() {
+            return mock(InscricaoRepository.class);
+        }
+
+        @Bean
+        ProgramaRepository programaRepository() {
+            return mock(ProgramaRepository.class);
         }
 
         @Bean

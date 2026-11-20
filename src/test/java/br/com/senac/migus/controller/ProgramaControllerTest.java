@@ -10,6 +10,7 @@ import br.com.senac.migus.config.SecurityConfig;
 import br.com.senac.migus.exception.GlobalExceptionHandler;
 import br.com.senac.migus.model.Programa;
 import br.com.senac.migus.model.Usuarios;
+import br.com.senac.migus.repository.InscricaoRepository;
 import br.com.senac.migus.repository.ProgramaRepository;
 import br.com.senac.migus.repository.UsuariosRepository;
 import br.com.senac.migus.service.*;
@@ -454,6 +455,7 @@ class ProgramaControllerTest {
     static class Config {
         @Bean UsuariosRepository usuariosRepository() { return mock(UsuariosRepository.class); }
         @Bean ProgramaRepository programaRepository() { return mock(ProgramaRepository.class); }
+        @Bean InscricaoRepository inscricaoRepository() { return mock(InscricaoRepository.class); }
         @Bean JwtService jwtService() {
             String chaveFicticia = Base64.getEncoder().encodeToString(
                     "chave-ficticia-apenas-para-testes-123456789".getBytes(StandardCharsets.UTF_8));

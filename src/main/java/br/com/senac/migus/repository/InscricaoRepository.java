@@ -13,6 +13,8 @@ public interface InscricaoRepository extends MongoRepository<Inscricao, String> 
 
     List<Inscricao> findByProgramaIdAndStatus(String programaId, String status);
 
+    List<Inscricao> findByProgramaIdAndStatusIn(String programaId, List<String> statuses);
+
     List<Inscricao> findByStatus(String status);
 
     Optional<Inscricao> findByVoluntarioIdAndProgramaId(String voluntarioId, String programaId);

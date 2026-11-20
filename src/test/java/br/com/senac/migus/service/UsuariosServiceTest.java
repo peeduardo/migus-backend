@@ -10,6 +10,8 @@ import br.com.senac.migus.dto.UsuarioResponseDTO;
 import br.com.senac.migus.dto.UsuarioUpdateRequestDTO;
 import br.com.senac.migus.exception.ResourceNotFoundException;
 import br.com.senac.migus.model.Usuarios;
+import br.com.senac.migus.repository.InscricaoRepository;
+import br.com.senac.migus.repository.ProgramaRepository;
 import br.com.senac.migus.repository.UsuariosRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,6 +36,12 @@ class UsuariosServiceTest {
 
     @Mock
     private UsuariosRepository usuariosRepository;
+
+    @Mock
+    private InscricaoRepository inscricaoRepository;
+
+    @Mock
+    private ProgramaRepository programaRepository;
 
     @InjectMocks
     private UsuariosService usuariosService;

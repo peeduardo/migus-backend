@@ -2,6 +2,8 @@ package br.com.senac.migus.controller;
 
 import br.com.senac.migus.exception.GlobalExceptionHandler;
 import br.com.senac.migus.model.Usuarios;
+import br.com.senac.migus.repository.InscricaoRepository;
+import br.com.senac.migus.repository.ProgramaRepository;
 import br.com.senac.migus.repository.UsuariosRepository;
 import br.com.senac.migus.service.UsuariosService;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,7 +34,8 @@ class UsuariosAutorizacaoTest {
         usuario.setAtivo(true);
         when(repository.findById("usuario-1")).thenReturn(Optional.of(usuario));
         when(repository.atualizarDadosPessoais(any(), any(), any(), any(), any(), any())).thenReturn(1L);
-        mvc = MockMvcBuilders.standaloneSetup(new UsuariosController(new UsuariosService(repository)))
+        mvc = MockMvcBuilders.standaloneSetup(new UsuariosController(new UsuariosService(repository,
+                mock(InscricaoRepository.class), mock(ProgramaRepository.class))))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
     }
 

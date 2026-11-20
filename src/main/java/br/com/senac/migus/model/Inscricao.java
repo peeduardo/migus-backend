@@ -81,6 +81,11 @@ public class Inscricao {
         this.recado = recado;
     }
 
+    public void cancelar(Date data) {
+        this.status = "CANCELADA";
+        this.dataAtualizacao = data;
+    }
+
     public void sair(Date data) {
         this.status = "SAIDA";
         this.dataSaida = data;

@@ -2,6 +2,7 @@ package br.com.senac.migus.service;
 
 import br.com.senac.migus.dto.ProgramaRequestDTO;
 import br.com.senac.migus.model.Usuarios;
+import br.com.senac.migus.repository.InscricaoRepository;
 import br.com.senac.migus.repository.ProgramaRepository;
 import br.com.senac.migus.repository.UsuariosRepository;
 import com.mongodb.ConnectionString;
@@ -48,7 +49,8 @@ class ProgramaMongoIT {
             var factory = new MongoRepositoryFactory(mongo);
             var usuarios = factory.getRepository(UsuariosRepository.class);
             var programas = factory.getRepository(ProgramaRepository.class);
-            var service = new ProgramaService(programas, usuarios);
+            var inscricoes = factory.getRepository(InscricaoRepository.class);
+            var service = new ProgramaService(programas, usuarios, inscricoes);
             var responsavel = new Usuarios();
             String usuarioId = new ObjectId().toHexString();
             String nomePrograma = "Programa de teste " + UUID.randomUUID();

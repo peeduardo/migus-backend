@@ -7,6 +7,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import br.com.senac.migus.dto.ProgramaRequestDTO;
 import br.com.senac.migus.model.Programa;
 import br.com.senac.migus.model.Usuarios;
+import br.com.senac.migus.repository.InscricaoRepository;
 import br.com.senac.migus.repository.ProgramaRepository;
 import br.com.senac.migus.repository.UsuariosRepository;
 import org.bson.types.ObjectId;
@@ -26,6 +27,7 @@ class ProgramaServiceTest {
     void deveBloquearUsuarioSemPermissao(String perfil, boolean ativo) {
         var usuarios = mock(UsuariosRepository.class);
         var programas = mock(ProgramaRepository.class);
+        var inscricoes = mock(InscricaoRepository.class);
         var usuario = new Usuarios();
         usuario.setId("507f1f77bcf86cd799439011");
         usuario.setTipoUsuario(perfil);
@@ -35,7 +37,7 @@ class ProgramaServiceTest {
                 List.of("segunda"), "09:00", "12:00", true);
 
         var erro = assertThrows(AuthException.class,
-                () -> new ProgramaService(programas, usuarios).cadastrar(pedido, usuario.getId()));
+                () -> new ProgramaService(programas, usuarios, inscricoes).cadastrar(pedido, usuario.getId()));
 
         assertEquals(HttpStatus.FORBIDDEN, erro.getStatus());
         verify(programas, never()).save(any());
@@ -44,12 +46,13 @@ class ProgramaServiceTest {
     void buscarPorId_deveRetornarDetalhesDoPrograma() {
         var usuarios = mock(UsuariosRepository.class);
         var programas = mock(ProgramaRepository.class);
+        var inscricoes = mock(InscricaoRepository.class);
         var programa = new Programa("507f1f77bcf86cd799439011", "Apoio", "Apoio à comunidade",
                 List.of("Educação"), List.of("segunda"), "09:00", "12:00", true,
                 "responsavel-id", new Date(), null);
         when(programas.findById("507f1f77bcf86cd799439011")).thenReturn(Optional.of(programa));
 
-        var dto = new ProgramaService(programas, usuarios).buscarPorId("507f1f77bcf86cd799439011");
+        var dto = new ProgramaService(programas, usuarios, inscricoes).buscarPorId("507f1f77bcf86cd799439011");
 
         assertEquals("507f1f77bcf86cd799439011", dto.id());
         assertEquals("Apoio", dto.nome());
@@ -62,10 +65,11 @@ class ProgramaServiceTest {
     void buscarPorId_deveLancarExcecaoSeNaoEncontrado() {
         var usuarios = mock(UsuariosRepository.class);
         var programas = mock(ProgramaRepository.class);
+        var inscricoes = mock(InscricaoRepository.class);
         when(programas.findById("inexistente")).thenReturn(Optional.empty());
 
         var ex = assertThrows(br.com.senac.migus.exception.ResourceNotFoundException.class,
-                () -> new ProgramaService(programas, usuarios).buscarPorId("inexistente"));
+                () -> new ProgramaService(programas, usuarios, inscricoes).buscarPorId("inexistente"));
 
         assertEquals("Programa não encontrado com o ID: inexistente", ex.getMessage());
     }
@@ -84,7 +88,7 @@ class ProgramaServiceTest {
                 List.of("segunda"), "09:00", "12:00", false);
         var inicio = new Date();
 
-        var programa = new ProgramaService(programas, usuarios).cadastrar(pedido, responsavel.getId());
+        var programa = new ProgramaService(programas, usuarios, mock(InscricaoRepository.class)).cadastrar(pedido, responsavel.getId());
 
         assertTrue(ObjectId.isValid(programa.getId()));
         assertEquals(responsavel.getId(), programa.getResponsavelId());
@@ -101,10 +105,11 @@ class ProgramaServiceTest {
         verify(programas).save(programa);
     }
     private ProgramaService service() {
-        return new ProgramaService(programas, usuarios);
+        return new ProgramaService(programas, usuarios, inscricoes);
     }
     private ProgramaRepository programas = mock(ProgramaRepository.class);
     private UsuariosRepository usuarios = mock(UsuariosRepository.class);
+    private InscricaoRepository inscricoes = mock(InscricaoRepository.class);
 
     private Usuarios responsavel(String id, String tipo, boolean ativo) {
         var u = new Usuarios(); u.setId(id); u.setTipoUsuario(tipo); u.setAtivo(ativo); return u;
@@ -122,6 +127,7 @@ class ProgramaServiceTest {
         when(usuarios.findById("resp-1")).thenReturn(Optional.of(r));
         when(programas.findByIdAndResponsavelId("prog-1", "resp-1")).thenReturn(Optional.of(programa("prog-1", "resp-1")));
         when(programas.save(any())).thenAnswer(call -> call.getArgument(0));
+        when(inscricoes.findByProgramaIdAndStatusIn(any(), any())).thenReturn(List.of());
 
         var resultado = service().alterarDisponibilidade("prog-1", false, "resp-1");
 
