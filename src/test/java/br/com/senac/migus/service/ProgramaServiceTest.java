@@ -19,6 +19,8 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class ProgramaServiceTest {
@@ -266,5 +268,41 @@ class ProgramaServiceTest {
         when(usuarios.findById("u")).thenReturn(Optional.of(responsavel("u", "interessado", true)));
         assertEquals(HttpStatus.FORBIDDEN,
                 assertThrows(AuthException.class, () -> service().listarMeusProgramas("u")).getStatus());
+    }
+
+    @Test
+    void deveLancarExcecaoSeResponsavelTemObjectIdInvalido() {
+        var resp = responsavel("id-invalido", "RESPONSAVEL", true);
+        when(usuarios.findById("id-invalido")).thenReturn(Optional.of(resp));
+        var pedido = new ProgramaRequestDTO("Apoio", "Desc", List.of("Educação"),
+                List.of("segunda"), "09:00", "12:00", true);
+
+        var erro = assertThrows(AuthException.class, () -> service().cadastrar(pedido, "id-invalido"));
+        assertEquals(HttpStatus.FORBIDDEN, erro.getStatus());
+        verify(programas, never()).save(any());
+    }
+
+    @Test
+    void deveAlterarDisponibilidadeSuspendendoInscricoesAtivas() {
+        String progId = "prog-sust";
+        var r = responsavel("resp-1", "RESPONSAVEL", true);
+        when(usuarios.findById("resp-1")).thenReturn(Optional.of(r));
+        when(programas.findByIdAndResponsavelId(progId, "resp-1")).thenReturn(Optional.of(programa(progId, "resp-1")));
+        when(programas.save(any())).thenAnswer(c -> c.getArgument(0));
+
+        var pendente = new br.com.senac.migus.model.Inscricao("i1", "vol1", progId, "PENDENTE",
+                new java.util.Date(), null, null, null);
+        var aprovada = new br.com.senac.migus.model.Inscricao("i2", "vol2", progId, "APROVADA",
+                new java.util.Date(), new java.util.Date(), null, null);
+        when(inscricoes.findByProgramaIdAndStatusIn(eq(progId), any()))
+                .thenReturn(List.of(pendente, aprovada));
+        when(inscricoes.saveAll(any())).thenReturn(List.of());
+
+        service().alterarDisponibilidade(progId, false, "resp-1");
+
+        verify(inscricoes).saveAll(argThat(lista -> {
+            var l = (java.util.List<?>) lista;
+            return l.stream().allMatch(i -> "SUSPENSA".equals(((br.com.senac.migus.model.Inscricao) i).getStatus()));
+        }));
     }
 }

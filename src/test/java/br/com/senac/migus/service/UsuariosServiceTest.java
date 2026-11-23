@@ -359,6 +359,55 @@ class UsuariosServiceTest {
                 .isEqualTo(org.springframework.http.HttpStatus.CONFLICT);
     }
 
+    @Test
+    void desativarMinhaConta_deveLancarExcecaoSeDesativarRetornaZero() {
+        var usuario = conta("user-1", "VOLUNTARIO", true);
+        when(usuariosRepository.findById("user-1")).thenReturn(Optional.of(usuario));
+        when(usuariosRepository.desativarParticipante(eq("user-1"), eq("VOLUNTARIO"), any())).thenReturn(0L);
+
+        assertThatThrownBy(() -> usuariosService.desativarMinhaConta("user-1"))
+                .isInstanceOf(AuthException.class)
+                .extracting(e -> ((AuthException) e).getStatus())
+                .isEqualTo(org.springframework.http.HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void atualizar_deveLancarExcecaoSeAutenticacaoNula() {
+        var dto = new UsuarioUpdateRequestDTO("Ana", "ana@email.com", null, null, null, null);
+        assertThatThrownBy(() -> usuariosService.atualizar("user-1", dto, null))
+                .isInstanceOf(AuthException.class)
+                .extracting(e -> ((AuthException) e).getStatus())
+                .isEqualTo(org.springframework.http.HttpStatus.UNAUTHORIZED);
+        verify(usuariosRepository, never()).atualizarDadosPessoais(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void atualizar_naoDeveLancarExcecaoSeEmailPertenceAoMesmoUsuario() {
+        when(usuariosRepository.findById("user-123")).thenReturn(Optional.of(usuarioExistente));
+        var outro = new Usuarios();
+        outro.setId("user-123"); // mesmo ID — não é duplicata
+        when(usuariosRepository.findByEmail("novo@email.com")).thenReturn(Optional.of(outro));
+        when(usuariosRepository.atualizarDadosPessoais(any(), any(), any(), any(), any(), any())).thenReturn(1L);
+
+        var dto = new UsuarioUpdateRequestDTO("João Silva", "novo@email.com", null, null, null, null);
+        var resp = usuariosService.atualizar("user-123", dto, "user-123");
+
+        assertThat(resp).isNotNull();
+    }
+
+    @Test
+    void atualizar_deveLancarExcecaoParaIdadeMenorQue17Anos() {
+        when(usuariosRepository.findById("user-123")).thenReturn(Optional.of(usuarioExistente));
+        LocalDate menorDeIdade = LocalDate.now().minusYears(16);
+        var dto = new UsuarioUpdateRequestDTO("João", "joao@email.com", null, menorDeIdade, null, null);
+
+        assertThatThrownBy(() -> usuariosService.atualizar("user-123", dto, "user-123"))
+                .isInstanceOf(AuthException.class)
+                .extracting(e -> ((AuthException) e).getStatus())
+                .isEqualTo(org.springframework.http.HttpStatus.BAD_REQUEST);
+        verify(usuariosRepository, never()).atualizarDadosPessoais(any(), any(), any(), any(), any(), any());
+    }
+
     // --- exportarDados ---
 
     @Test
