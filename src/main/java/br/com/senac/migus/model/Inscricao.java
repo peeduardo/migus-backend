@@ -86,6 +86,11 @@ public class Inscricao {
         this.dataAtualizacao = data;
     }
 
+    public void suspender(Date data) {
+        this.status = "SUSPENSA";
+        this.dataAtualizacao = data;
+    }
+
     public void sair(Date data) {
         this.status = "SAIDA";
         this.dataSaida = data;

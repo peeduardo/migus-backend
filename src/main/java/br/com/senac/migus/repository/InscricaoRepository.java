@@ -20,4 +20,6 @@ public interface InscricaoRepository extends MongoRepository<Inscricao, String> 
     Optional<Inscricao> findByVoluntarioIdAndProgramaId(String voluntarioId, String programaId);
 
     boolean existsByVoluntarioIdAndProgramaId(String voluntarioId, String programaId);
+
+    boolean existsByVoluntarioIdAndProgramaIdAndStatusNot(String voluntarioId, String programaId, String status);
 }

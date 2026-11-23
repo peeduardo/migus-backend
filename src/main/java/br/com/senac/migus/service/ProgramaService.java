@@ -138,7 +138,7 @@ public class ProgramaService {
                 programaId, List.of("PENDENTE", "APROVADA"));
         if (ativas.isEmpty()) return;
         Date agora = new Date();
-        ativas.forEach(i -> i.cancelar(agora));
+        ativas.forEach(i -> i.suspender(agora));
         inscricoes.saveAll(ativas);
     }
 
