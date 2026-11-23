@@ -292,7 +292,7 @@ class InscricaoServiceTest {
 
     @Test
     void deveRejeitarInscricaoDuplicada() {
-        when(inscricoes.existsByVoluntarioIdAndProgramaId(USUARIO_ID, PROGRAMA_ID)).thenReturn(true);
+        when(inscricoes.existsByVoluntarioIdAndProgramaIdAndStatusNot(USUARIO_ID, PROGRAMA_ID, "SUSPENSA")).thenReturn(true);
         var erro = assertThrows(AuthException.class, () -> service.inscrever(PROGRAMA_ID, USUARIO_ID, null));
         assertEquals(HttpStatus.CONFLICT, erro.getStatus());
         verify(inscricoes, never()).save(any());
@@ -610,5 +610,78 @@ class InscricaoServiceTest {
         assertEquals(HttpStatus.FORBIDDEN, erro.getStatus());
         verifyNoInteractions(inscricoes);
         verify(usuarios, never()).findAllById(any());
+    }
+
+    // --- gaps de cobertura: inscrever ---
+
+    @Test
+    void inscrever_deveLancarExcecaoSeUsuarioNaoEncontrado() {
+        when(usuarios.findById(USUARIO_ID)).thenReturn(Optional.empty());
+        var erro = assertThrows(AuthException.class,
+                () -> service.inscrever(PROGRAMA_ID, USUARIO_ID, null));
+        assertEquals(HttpStatus.FORBIDDEN, erro.getStatus());
+    }
+
+    @Test
+    void inscrever_deveLancarExcecaoSeObjectIdDoVoluntarioInvalido() {
+        var usuario = new Usuarios();
+        usuario.setId("id-invalido-nao-objectid");
+        usuario.setAtivo(true);
+        when(usuarios.findById("507f1f77bcf86cd799439099")).thenReturn(Optional.of(usuario));
+        var prog = new Programa(PROGRAMA_ID, "P", "D", null, null, "09:00", "12:00", true, "resp", new Date(), null);
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.of(prog));
+        var erro = assertThrows(AuthException.class,
+                () -> service.inscrever(PROGRAMA_ID, "507f1f77bcf86cd799439099", null));
+        assertEquals(HttpStatus.FORBIDDEN, erro.getStatus());
+    }
+
+    // --- gaps de cobertura: transferir ---
+
+    @Test
+    void transferir_deveLancarExcecaoSeObjectIdDoDestinoInvalido() {
+        autenticarComoResponsavel("RESPONSAVEL", true);
+        var inscricao = new Inscricao(INSCRICAO_ID, USUARIO_ID, PROGRAMA_ID, "APROVADA",
+                new Date(), new Date(), null, null);
+        when(inscricoes.findById(INSCRICAO_ID)).thenReturn(Optional.of(inscricao));
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.of(
+                new Programa(PROGRAMA_ID, "P", "D", null, null, "09:00", "12:00", true, RESPONSAVEL_ID, new Date(), null)));
+        var erro = assertThrows(ResourceNotFoundException.class,
+                () -> service.transferir(INSCRICAO_ID, "id-invalido", RESPONSAVEL_ID, null));
+        assertNotNull(erro);
+    }
+
+    @Test
+    void transferir_deveLancarExcecaoSeDestinoInativo() {
+        String DESTINO_ID = "507f1f77bcf86cd799439099";
+        autenticarComoResponsavel("RESPONSAVEL", true);
+        var inscricao = new Inscricao(INSCRICAO_ID, USUARIO_ID, PROGRAMA_ID, "APROVADA",
+                new Date(), new Date(), null, null);
+        when(inscricoes.findById(INSCRICAO_ID)).thenReturn(Optional.of(inscricao));
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.of(
+                new Programa(PROGRAMA_ID, "P", "D", null, null, "09:00", "12:00", true, RESPONSAVEL_ID, new Date(), null)));
+        when(programas.findById(DESTINO_ID)).thenReturn(Optional.of(
+                new Programa(DESTINO_ID, "P2", "D2", null, null, "09:00", "12:00", false, "resp2", new Date(), null)));
+        var erro = assertThrows(IllegalArgumentException.class,
+                () -> service.transferir(INSCRICAO_ID, DESTINO_ID, RESPONSAVEL_ID, null));
+        assertEquals("O programa destino não está ativo", erro.getMessage());
+    }
+
+    // --- gaps de cobertura: registrarSaida ---
+
+    @Test
+    void registrarSaida_deveLancarExcecaoComObjectIdInvalidoNoProgramaOuInscricao() {
+        autenticarComoResponsavel("RESPONSAVEL", true);
+        var erro = assertThrows(ResourceNotFoundException.class,
+                () -> service.registrarSaida("id-invalido", INSCRICAO_ID, RESPONSAVEL_ID, null));
+        assertNotNull(erro);
+    }
+
+    @Test
+    void registrarSaida_deveLancarExcecaoSeProgramaNaoEncontrado() {
+        autenticarComoResponsavel("RESPONSAVEL", true);
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.empty());
+        var erro = assertThrows(ResourceNotFoundException.class,
+                () -> service.registrarSaida(PROGRAMA_ID, INSCRICAO_ID, RESPONSAVEL_ID, null));
+        assertNotNull(erro);
     }
 }

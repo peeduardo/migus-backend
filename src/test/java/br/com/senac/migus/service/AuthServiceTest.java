@@ -201,6 +201,19 @@ class AuthServiceTest {
         verify(jwtService, never()).generateToken(any(), any(), any());
     }
 
+    @Test
+    void deveLancarExcecaoParaIdadeMenorQue17Anos() {
+        LocalDate menorDeIdade = LocalDate.now().minusYears(16);
+        var req = new CadastroRequestDTO("Ana", "nova@exemplo.com", "senha-ok12",
+                "99988877766", null, menorDeIdade);
+        when(usuariosRepository.existsByEmail(any())).thenReturn(false);
+        when(usuariosRepository.existsByCpf(any())).thenReturn(false);
+
+        var erro = assertThrows(AuthException.class, () -> authService.cadastrar(req));
+        assertEquals(HttpStatus.BAD_REQUEST, erro.getStatus());
+        verify(usuariosRepository, never()).save(any());
+    }
+
     private CadastroRequestDTO cadastroRequest() {
         return new CadastroRequestDTO(" Ana Silva ", " Ana@Exemplo.com ", "senha-segura",
                 "12345678900", "11999999999", LocalDate.of(2000, 5, 20));

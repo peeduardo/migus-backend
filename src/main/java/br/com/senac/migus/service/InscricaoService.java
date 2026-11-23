@@ -58,7 +58,7 @@ public class InscricaoService {
         if (!Boolean.TRUE.equals(programa.getAtivo())) {
             throw new IllegalArgumentException("O programa não está ativo para inscrições");
         }
-        if (inscricoes.existsByVoluntarioIdAndProgramaId(voluntario.getId(), programa.getId())) {
+        if (inscricoes.existsByVoluntarioIdAndProgramaIdAndStatusNot(voluntario.getId(), programa.getId(), "SUSPENSA")) {
             throw new AuthException("Você já está inscrito neste programa", HttpStatus.CONFLICT);
         }
         var inscricao = new Inscricao(new ObjectId().toHexString(), voluntario.getId(), programa.getId(),

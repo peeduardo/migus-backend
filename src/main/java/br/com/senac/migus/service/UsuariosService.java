@@ -1,25 +1,41 @@
 package br.com.senac.migus.service;
 
 import br.com.senac.migus.exception.AuthException;
+import br.com.senac.migus.dto.DadosPessoaisExportDTO;
+import br.com.senac.migus.dto.MinhaInscricaoDTO;
 import br.com.senac.migus.dto.UsuarioDTO;
-
 import br.com.senac.migus.dto.UsuarioResponseDTO;
 import br.com.senac.migus.dto.UsuarioUpdateRequestDTO;
 import br.com.senac.migus.exception.ResourceNotFoundException;
+import br.com.senac.migus.model.Inscricao;
+import br.com.senac.migus.model.Programa;
 import br.com.senac.migus.model.Usuarios;
+import br.com.senac.migus.repository.InscricaoRepository;
+import br.com.senac.migus.repository.ProgramaRepository;
 import br.com.senac.migus.repository.UsuariosRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.http.HttpStatus;
 
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class UsuariosService {
 
     private final UsuariosRepository usuariosRepository;
+    private final InscricaoRepository inscricaoRepository;
+    private final ProgramaRepository programaRepository;
 
-    public UsuariosService(UsuariosRepository usuariosRepository) {
+    public UsuariosService(UsuariosRepository usuariosRepository,
+                           InscricaoRepository inscricaoRepository,
+                           ProgramaRepository programaRepository) {
         this.usuariosRepository = usuariosRepository;
+        this.inscricaoRepository = inscricaoRepository;
+        this.programaRepository = programaRepository;
     }
 
     public void desativarMinhaConta(String id) {
@@ -100,6 +116,10 @@ public class UsuariosService {
             usuario.setTelefone(dto.telefone());
         }
         if (dto.dataNascimento() != null) {
+            if (dto.dataNascimento().isAfter(LocalDate.now().minusYears(17))) {
+                throw new AuthException("É necessário ter no mínimo 17 anos para atualizar o cadastro",
+                        HttpStatus.BAD_REQUEST);
+            }
             usuario.setDataNascimento(dto.dataNascimento());
         }
         usuario.setDataAtualizacao(LocalDate.now());
@@ -111,5 +131,36 @@ public class UsuariosService {
             throw contaIndisponivel();
         }
         return UsuarioResponseDTO.comSucesso(usuario);
+    }
+
+    public DadosPessoaisExportDTO exportarDados(String userId) {
+        Usuarios usuario = usuariosRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+        List<Inscricao> inscricoesList = inscricaoRepository.findByVoluntarioId(userId);
+        Map<String, Programa> programasPorId = programaRepository
+                .findAllById(inscricoesList.stream().map(Inscricao::getProgramaId).distinct().toList())
+                .stream().collect(Collectors.toMap(Programa::getId, Function.identity()));
+        List<MinhaInscricaoDTO> inscricoesDTO = inscricoesList.stream()
+                .map(i -> MinhaInscricaoDTO.of(i, programasPorId.get(i.getProgramaId())))
+                .toList();
+        return DadosPessoaisExportDTO.of(usuario, inscricoesDTO);
+    }
+
+    public UsuarioResponseDTO anonimizarMinhaConta(String userId) {
+        Usuarios usuario = usuariosRepository.findById(userId)
+                .orElseThrow(this::contaIndisponivel);
+        String emailAnonimo = "removido-" + UUID.randomUUID() + "@anonimizado.invalid";
+        String cpfAnonimo = "00000000000";
+        long alterados = usuariosRepository.anonimizarUsuario(userId, emailAnonimo, cpfAnonimo, LocalDate.now());
+        if (alterados == 0) {
+            throw contaIndisponivel();
+        }
+        usuario.setNome("Usuário Removido");
+        usuario.setEmail(emailAnonimo);
+        usuario.setCpf(cpfAnonimo);
+        usuario.setTelefone(null);
+        usuario.setDataNascimento(null);
+        usuario.setAtivo(false);
+        return new UsuarioResponseDTO("Dados pessoais anonimizados com sucesso.", UsuarioDTO.fromEntity(usuario));
     }
 }

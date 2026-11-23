@@ -5,7 +5,9 @@ import br.com.senac.migus.exception.AuthException;
 import br.com.senac.migus.exception.ResourceNotFoundException;
 
 import br.com.senac.migus.dto.ProgramaRequestDTO;
+import br.com.senac.migus.model.Inscricao;
 import br.com.senac.migus.model.Programa;
+import br.com.senac.migus.repository.InscricaoRepository;
 import br.com.senac.migus.repository.ProgramaRepository;
 import br.com.senac.migus.repository.UsuariosRepository;
 import org.bson.types.ObjectId;
@@ -19,10 +21,13 @@ import java.util.List;
 public class ProgramaService {
     private final ProgramaRepository programas;
     private final UsuariosRepository usuarios;
+    private final InscricaoRepository inscricoes;
 
-    public ProgramaService(ProgramaRepository programas, UsuariosRepository usuarios) {
+    public ProgramaService(ProgramaRepository programas, UsuariosRepository usuarios,
+                           InscricaoRepository inscricoes) {
         this.programas = programas;
         this.usuarios = usuarios;
+        this.inscricoes = inscricoes;
     }
 
     public Programa cadastrar(ProgramaRequestDTO pedido, String usuarioId) {
@@ -119,7 +124,22 @@ public class ProgramaService {
                 programa.getDataCadastro(),
                 new Date());
 
-        return programas.save(programaAtualizado);
+        programas.save(programaAtualizado);
+
+        if (!Boolean.TRUE.equals(ativo)) {
+            cancelarInscricoesAtivas(programaId);
+        }
+
+        return programaAtualizado;
+    }
+
+    private void cancelarInscricoesAtivas(String programaId) {
+        List<Inscricao> ativas = inscricoes.findByProgramaIdAndStatusIn(
+                programaId, List.of("PENDENTE", "APROVADA"));
+        if (ativas.isEmpty()) return;
+        Date agora = new Date();
+        ativas.forEach(i -> i.suspender(agora));
+        inscricoes.saveAll(ativas);
     }
 
     public List<Programa> listarMeusProgramas(String usuarioId) {

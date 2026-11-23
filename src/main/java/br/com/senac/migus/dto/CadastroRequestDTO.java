@@ -2,6 +2,7 @@ package br.com.senac.migus.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -15,5 +16,6 @@ public record CadastroRequestDTO(
                 @NotBlank(message = "CPF é obrigatório")
                 @Pattern(regexp = "[0-9]{11}", message = "CPF deve conter 11 números") String cpf,
                 String telefone,
+                @NotNull(message = "Data de nascimento é obrigatória")
                 @Past(message = "Data de nascimento deve ser anterior à data atual") LocalDate dataNascimento) {
 }
