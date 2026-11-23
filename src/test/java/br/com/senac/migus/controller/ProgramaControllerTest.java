@@ -447,6 +447,68 @@ class ProgramaControllerTest {
                 .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3000"));
     }
 
+    // --- PATCH /{id}/disponibilidade ---
+
+    private static final String DISPONIBILIDADE = "/api/programas/" + PROGRAMA_ID + "/disponibilidade";
+
+    @Test
+    void deveAlterarDisponibilidadeDoPrograma() throws Exception {
+        when(programas.findByIdAndResponsavelId(eq(PROGRAMA_ID), any())).thenReturn(
+                java.util.Optional.of(programaExistente(USUARIO_ID)));
+        when(programas.save(any())).thenAnswer(c -> c.getArgument(0));
+        when(context.getBean(InscricaoRepository.class).findByProgramaIdAndStatusIn(any(), any()))
+                .thenReturn(java.util.List.of());
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .patch(DISPONIBILIDADE)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"ativo\":false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ativo").value(false));
+    }
+
+    @Test
+    void deveRejeitarDisponibilidadeSemCampoAtivo() throws Exception {
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .patch(DISPONIBILIDADE)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void deveRejeitarDisponibilidadeSemToken() throws Exception {
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .patch(DISPONIBILIDADE)
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"ativo\":false}"))
+                .andExpect(status().isForbidden());
+    }
+
+    // --- GET /meus ---
+
+    @Test
+    void deveListarMeusProgramas() throws Exception {
+        var programa = programaExistente(USUARIO_ID);
+        when(programas.findByResponsavelId(USUARIO_ID)).thenReturn(java.util.List.of(programa));
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/programas/meus")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(PROGRAMA_ID));
+    }
+
+    @Test
+    void deveRejeitarListagemDeMeusProgramasSemToken() throws Exception {
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/programas/meus"))
+                .andExpect(status().isForbidden());
+    }
+
     @Configuration
     @EnableWebMvc
     @EnableWebSecurity

@@ -1,5 +1,7 @@
 package br.com.senac.migus.controller;
 
+import br.com.senac.migus.dto.DadosPessoaisExportDTO;
+import br.com.senac.migus.dto.MinhaInscricaoDTO;
 import br.com.senac.migus.dto.UsuarioDTO;
 import br.com.senac.migus.dto.UsuarioResponseDTO;
 import br.com.senac.migus.dto.UsuarioUpdateRequestDTO;
@@ -23,6 +25,7 @@ import java.time.LocalDate;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -191,5 +194,64 @@ class UsuariosControllerTest {
                 .andExpect(jsonPath("$.email").value("joao@email.com"))
                 .andExpect(jsonPath("$.senhaHash").doesNotExist())
                 .andExpect(jsonPath("$.senha").doesNotExist());
+    }
+
+    @Test
+    void exportarMeusDados_deveRetornar200ComDadosEInscricoes() throws Exception {
+        var inscricao = new MinhaInscricaoDTO("insc-1", "prog-1", "Apoio",
+                new java.util.Date(), "APROVADA", null, null);
+        var export = new DadosPessoaisExportDTO(
+                "user-1", "João", "joao@email.com", "12345678901", null,
+                LocalDate.of(1990, 1, 1), "VOLUNTARIO", true,
+                LocalDate.now(), null, java.util.List.of(inscricao));
+
+        var auth = new UsernamePasswordAuthenticationToken(
+                "user-1", null, AuthorityUtils.NO_AUTHORITIES);
+
+        when(usuariosService.exportarDados("user-1")).thenReturn(export);
+
+        mockMvc.perform(get("/api/usuarios/me/dados").principal(auth))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("user-1"))
+                .andExpect(jsonPath("$.email").value("joao@email.com"))
+                .andExpect(jsonPath("$.inscricoes[0].programaNome").value("Apoio"))
+                .andExpect(jsonPath("$.inscricoes[0].status").value("APROVADA"));
+    }
+
+    @Test
+    void exportarMeusDados_semInscricoes_deveRetornarListaVazia() throws Exception {
+        var export = new DadosPessoaisExportDTO(
+                "user-1", "João", "joao@email.com", "12345678901", null,
+                null, "VOLUNTARIO", true, LocalDate.now(), null, java.util.List.of());
+
+        var auth = new UsernamePasswordAuthenticationToken(
+                "user-1", null, AuthorityUtils.NO_AUTHORITIES);
+
+        when(usuariosService.exportarDados("user-1")).thenReturn(export);
+
+        mockMvc.perform(get("/api/usuarios/me/dados").principal(auth))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.inscricoes").isArray())
+                .andExpect(jsonPath("$.inscricoes").isEmpty());
+    }
+
+    @Test
+    void anonimizarMinhaConta_deveRetornar200ComMensagemDeSucesso() throws Exception {
+        var anonimo = new UsuarioDTO("user-1", "Usuário Removido",
+                "removido-uuid@anonimizado.invalid", "00000000000",
+                null, null, "VOLUNTARIO", false, LocalDate.now(), LocalDate.now());
+        var resposta = new UsuarioResponseDTO("Dados pessoais anonimizados com sucesso.", anonimo);
+
+        var auth = new UsernamePasswordAuthenticationToken(
+                "user-1", null, AuthorityUtils.NO_AUTHORITIES);
+
+        when(usuariosService.anonimizarMinhaConta("user-1")).thenReturn(resposta);
+
+        mockMvc.perform(delete("/api/usuarios/me").principal(auth))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mensagem").value("Dados pessoais anonimizados com sucesso."))
+                .andExpect(jsonPath("$.usuario.nome").value("Usuário Removido"))
+                .andExpect(jsonPath("$.usuario.cpf").value("00000000000"))
+                .andExpect(jsonPath("$.usuario.ativo").value(false));
     }
 }

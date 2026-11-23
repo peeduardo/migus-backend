@@ -5,10 +5,13 @@ import org.springframework.data.mongodb.repository.Update;
 import org.springframework.data.mongodb.repository.Query;
 import org.bson.Document;
 import org.springframework.data.mongodb.util.json.ParameterBindingDocumentCodec;
+import br.com.senac.migus.dto.DadosPessoaisExportDTO;
 import br.com.senac.migus.dto.UsuarioDTO;
 import br.com.senac.migus.dto.UsuarioResponseDTO;
 import br.com.senac.migus.dto.UsuarioUpdateRequestDTO;
 import br.com.senac.migus.exception.ResourceNotFoundException;
+import br.com.senac.migus.model.Inscricao;
+import br.com.senac.migus.model.Programa;
 import br.com.senac.migus.model.Usuarios;
 import br.com.senac.migus.repository.InscricaoRepository;
 import br.com.senac.migus.repository.ProgramaRepository;
@@ -354,5 +357,115 @@ class UsuariosServiceTest {
                 .isInstanceOf(AuthException.class)
                 .extracting(erro -> ((AuthException) erro).getStatus())
                 .isEqualTo(org.springframework.http.HttpStatus.CONFLICT);
+    }
+
+    // --- exportarDados ---
+
+    @Test
+    void exportarDados_deveRetornarDadosComInscricoes() {
+        var programa = new Programa("prog-1", "Apoio", "Desc", java.util.List.of("Educação"),
+                java.util.List.of("segunda"), "09:00", "12:00", true, "resp-1", new java.util.Date(), null);
+        var inscricao = new Inscricao("insc-1", "user-123", "prog-1", "APROVADA",
+                new java.util.Date(), new java.util.Date(), null, null);
+
+        when(usuariosRepository.findById("user-123")).thenReturn(Optional.of(usuarioExistente));
+        when(inscricaoRepository.findByVoluntarioId("user-123")).thenReturn(java.util.List.of(inscricao));
+        when(programaRepository.findAllById(java.util.List.of("prog-1"))).thenReturn(java.util.List.of(programa));
+
+        DadosPessoaisExportDTO resultado = usuariosService.exportarDados("user-123");
+
+        assertThat(resultado.id()).isEqualTo("user-123");
+        assertThat(resultado.nome()).isEqualTo("João Silva");
+        assertThat(resultado.email()).isEqualTo("joao@email.com");
+        assertThat(resultado.cpf()).isEqualTo("12345678901");
+        assertThat(resultado.inscricoes()).hasSize(1);
+        assertThat(resultado.inscricoes().get(0).programaNome()).isEqualTo("Apoio");
+        assertThat(resultado.inscricoes().get(0).status()).isEqualTo("APROVADA");
+    }
+
+    @Test
+    void exportarDados_semInscricoes_deveRetornarListaVazia() {
+        when(usuariosRepository.findById("user-123")).thenReturn(Optional.of(usuarioExistente));
+        when(inscricaoRepository.findByVoluntarioId("user-123")).thenReturn(java.util.List.of());
+        when(programaRepository.findAllById(java.util.List.of())).thenReturn(java.util.List.of());
+
+        DadosPessoaisExportDTO resultado = usuariosService.exportarDados("user-123");
+
+        assertThat(resultado.inscricoes()).isEmpty();
+    }
+
+    @Test
+    void exportarDados_deveRetornarNullParaNomeDeProgamaNaoEncontrado() {
+        var inscricao = new Inscricao("insc-1", "user-123", "prog-inexistente", "PENDENTE",
+                new java.util.Date(), null, null, null);
+        when(usuariosRepository.findById("user-123")).thenReturn(Optional.of(usuarioExistente));
+        when(inscricaoRepository.findByVoluntarioId("user-123")).thenReturn(java.util.List.of(inscricao));
+        when(programaRepository.findAllById(any())).thenReturn(java.util.List.of());
+
+        DadosPessoaisExportDTO resultado = usuariosService.exportarDados("user-123");
+
+        assertThat(resultado.inscricoes()).hasSize(1);
+        assertThat(resultado.inscricoes().get(0).programaNome()).isNull();
+    }
+
+    @Test
+    void exportarDados_deveLancarExcecaoSeUsuarioNaoEncontrado() {
+        when(usuariosRepository.findById("sumiu")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> usuariosService.exportarDados("sumiu"))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    // --- anonimizarMinhaConta ---
+
+    @Test
+    void anonimizarMinhaConta_deveAnonimizarERetornarSucesso() {
+        when(usuariosRepository.findById("user-123")).thenReturn(Optional.of(usuarioExistente));
+        when(usuariosRepository.anonimizarUsuario(eq("user-123"), any(), eq("00000000000"), any())).thenReturn(1L);
+
+        UsuarioResponseDTO resposta = usuariosService.anonimizarMinhaConta("user-123");
+
+        assertThat(resposta.mensagem()).isEqualTo("Dados pessoais anonimizados com sucesso.");
+        assertThat(resposta.usuario().nome()).isEqualTo("Usuário Removido");
+        assertThat(resposta.usuario().cpf()).isEqualTo("00000000000");
+        assertThat(resposta.usuario().email()).contains("@anonimizado.invalid");
+        assertThat(resposta.usuario().telefone()).isNull();
+        assertThat(resposta.usuario().dataNascimento()).isNull();
+        assertThat(resposta.usuario().ativo()).isFalse();
+    }
+
+    @Test
+    void anonimizarMinhaConta_deveLancarExcecaoSeUsuarioNaoEncontrado() {
+        when(usuariosRepository.findById("sumiu")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> usuariosService.anonimizarMinhaConta("sumiu"))
+                .isInstanceOf(AuthException.class)
+                .extracting(e -> ((AuthException) e).getStatus())
+                .isEqualTo(org.springframework.http.HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void anonimizarMinhaConta_deveLancarExcecaoSeAtualizacaoNaoAfetouRegistro() {
+        when(usuariosRepository.findById("user-123")).thenReturn(Optional.of(usuarioExistente));
+        when(usuariosRepository.anonimizarUsuario(any(), any(), any(), any())).thenReturn(0L);
+
+        assertThatThrownBy(() -> usuariosService.anonimizarMinhaConta("user-123"))
+                .isInstanceOf(AuthException.class)
+                .extracting(e -> ((AuthException) e).getStatus())
+                .isEqualTo(org.springframework.http.HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void anonimizarMinhaConta_deveGerarEmailUnico() {
+        when(usuariosRepository.findById("user-123")).thenReturn(Optional.of(usuarioExistente));
+        when(usuariosRepository.anonimizarUsuario(eq("user-123"), any(), any(), any())).thenReturn(1L);
+
+        var r1 = usuariosService.anonimizarMinhaConta("user-123");
+
+        when(usuariosRepository.findById("user-123")).thenReturn(Optional.of(usuarioExistente));
+        when(usuariosRepository.anonimizarUsuario(eq("user-123"), any(), any(), any())).thenReturn(1L);
+        var r2 = usuariosService.anonimizarMinhaConta("user-123");
+
+        assertThat(r1.usuario().email()).isNotEqualTo(r2.usuario().email());
     }
 }
