@@ -20,6 +20,9 @@ public class Inscricao {
     private Date dataAprovacao;
     private Date dataRecusa;
     private Date dataAtualizacao;
+    private Date dataSaida;
+    private String mensagem;
+    private String recado;
 
     public Inscricao(String id, String voluntarioId, String programaId, String status, Date dataInscricao,
                      Date dataAprovacao, Date dataRecusa, Date dataAtualizacao) {
@@ -56,6 +59,47 @@ public class Inscricao {
     }
     public Date getDataAtualizacao() {
         return dataAtualizacao;
+    }
+
+    public Date getDataSaida() {
+        return dataSaida;
+    }
+
+    public String getMensagem() {
+        return mensagem;
+    }
+
+    public String getRecado() {
+        return recado;
+    }
+
+    public void setMensagem(String mensagem) {
+        this.mensagem = mensagem;
+    }
+
+    public void setRecado(String recado) {
+        this.recado = recado;
+    }
+
+    public void cancelar(Date data) {
+        this.status = "CANCELADA";
+        this.dataAtualizacao = data;
+    }
+
+    public void suspender(Date data) {
+        this.status = "SUSPENSA";
+        this.dataAtualizacao = data;
+    }
+
+    public void sair(Date data) {
+        this.status = "SAIDA";
+        this.dataSaida = data;
+        this.dataAtualizacao = data;
+    }
+
+    public void transferir(Date data) {
+        this.status = "TRANSFERIDA";
+        this.dataAtualizacao = data;
     }
 
     public void aprovar(Date data) {

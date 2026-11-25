@@ -1,10 +1,14 @@
 package br.com.senac.migus.controller;
 
+import br.com.senac.migus.dto.DadosPessoaisExportDTO;
 import br.com.senac.migus.dto.UsuarioDTO;
 import br.com.senac.migus.dto.UsuarioResponseDTO;
 import br.com.senac.migus.dto.UsuarioUpdateRequestDTO;
 import br.com.senac.migus.service.UsuariosService;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import java.security.Principal;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -30,6 +34,34 @@ public class UsuariosController {
         String userId = (String) authentication.getPrincipal();
         UsuarioDTO usuario = usuariosService.getMeuPerfil(userId);
         return ResponseEntity.ok(usuario);
+    }
+
+    @GetMapping("/me/dados")
+    public ResponseEntity<DadosPessoaisExportDTO> exportarMeusDados(Authentication authentication) {
+        String userId = (String) authentication.getPrincipal();
+        return ResponseEntity.ok(usuariosService.exportarDados(userId));
+    }
+
+    @DeleteMapping("/me")
+    public ResponseEntity<UsuarioResponseDTO> anonimizarMinhaConta(Authentication authentication) {
+        String userId = (String) authentication.getPrincipal();
+        return ResponseEntity.ok(usuariosService.anonimizarMinhaConta(userId));
+    }
+
+    @PatchMapping("/me/desativar")
+    public ResponseEntity<Void> desativarMinhaConta(Principal principal, HttpServletRequest request,
+                                                     @RequestBody(required = false) byte[] corpo) {
+        if (request.getQueryString() != null || (corpo != null && corpo.length > 0)) {
+            throw new IllegalArgumentException("A desativação não aceita parâmetros nem corpo");
+        }
+        usuariosService.desativarMinhaConta(principal.getName());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{id}/inativar")
+    public ResponseEntity<UsuarioResponseDTO> inativarVoluntario(@PathVariable String id, Principal principal) {
+        UsuarioResponseDTO response = usuariosService.inativarVoluntario(id, principal == null ? null : principal.getName());
+        return ResponseEntity.ok(response);
     }
 
     @PutMapping("/{id}")

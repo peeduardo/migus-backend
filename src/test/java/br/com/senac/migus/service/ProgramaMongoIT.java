@@ -80,6 +80,14 @@ class ProgramaMongoIT {
                 assertInstanceOf(ObjectId.class, documento.get("_id"));
                 assertInstanceOf(ObjectId.class, documento.get("responsavelId"));
                 assertInstanceOf(Date.class, documento.get("dataCadastro"));
+                service.alterarDisponibilidade(salvo.getId(), false, usuarioId);
+                assertFalse(programas.findById(salvo.getId()).orElseThrow().getAtivo());
+                service.alterarDisponibilidade(salvo.getId(), true, usuarioId);
+                var reativado = programas.findById(salvo.getId()).orElseThrow();
+                assertTrue(reativado.getAtivo());
+                assertNotNull(reativado.getDataReativacao());
+                assertEquals(salvo.getDataCadastro(), reativado.getDataCadastro());
+                assertEquals(salvo.getResponsavelId(), reativado.getResponsavelId());
             } finally {
                 // Identificadores exclusivos desta execução; nunca remove coleções.
                 try {

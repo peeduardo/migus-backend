@@ -29,6 +29,8 @@ public class AuthService {
         this.jwtService = jwtService;
     }
 
+    private static final int IDADE_MINIMA = 17;
+
     public UsuarioResponseDTO cadastrar(CadastroRequestDTO request) {
         String email = normalizarEmail(request.email());
         if (usuariosRepository.existsByEmail(email)) {
@@ -36,6 +38,11 @@ public class AuthService {
         }
         if (usuariosRepository.existsByCpf(request.cpf())) {
             throw new AuthException("Já existe um usuário cadastrado com este CPF", HttpStatus.CONFLICT);
+        }
+        if (request.dataNascimento() != null
+                && request.dataNascimento().isAfter(LocalDate.now().minusYears(IDADE_MINIMA))) {
+            throw new AuthException("É necessário ter no mínimo " + IDADE_MINIMA + " anos para se cadastrar",
+                    HttpStatus.BAD_REQUEST);
         }
 
         Usuarios usuario = new Usuarios(
@@ -65,7 +72,7 @@ public class AuthService {
     private String definirTipoUsuario(String email) {
         String dominio = email.substring(email.lastIndexOf('@') + 1);
         boolean emailMigus = dominio.equals("migus") || dominio.startsWith("migus.");
-        return emailMigus ? "responsavel" : "interessado";
+        return emailMigus ? "RESPONSAVEL" : "interessado";
     }
 
     private String normalizarEmail(String email) {

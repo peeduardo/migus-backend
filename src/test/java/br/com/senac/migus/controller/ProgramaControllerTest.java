@@ -1,5 +1,6 @@
 package br.com.senac.migus.controller;
 
+import br.com.senac.migus.config.CorsConfig;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -9,6 +10,7 @@ import br.com.senac.migus.config.SecurityConfig;
 import br.com.senac.migus.exception.GlobalExceptionHandler;
 import br.com.senac.migus.model.Programa;
 import br.com.senac.migus.model.Usuarios;
+import br.com.senac.migus.repository.InscricaoRepository;
 import br.com.senac.migus.repository.ProgramaRepository;
 import br.com.senac.migus.repository.UsuariosRepository;
 import br.com.senac.migus.service.*;
@@ -29,7 +31,7 @@ import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class ProgramaControllerTest {
@@ -125,7 +127,7 @@ class ProgramaControllerTest {
         when(usuarios.findById(USUARIO_ID)).thenReturn(Optional.empty());
         mvc.perform(post("/api/programas").header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON).content(PEDIDO))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
         verify(programas, never()).save(any());
     }
 
@@ -192,9 +194,37 @@ class ProgramaControllerTest {
         verify(programas, never()).save(any());
     }
 
+    @Test
+    void deveBuscarProgramaPorId() throws Exception {
+        var programa = new Programa("507f1f77bcf86cd799439022", "Apoio", "Apoio à comunidade",
+                java.util.List.of("Educação"), java.util.List.of("segunda"), "09:00", "12:00", true,
+                USUARIO_ID, new java.util.Date(), null);
+        when(programas.findById("507f1f77bcf86cd799439022")).thenReturn(Optional.of(programa));
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .get("/api/programas/507f1f77bcf86cd799439022")
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("507f1f77bcf86cd799439022"))
+                .andExpect(jsonPath("$.nome").value("Apoio"))
+                .andExpect(jsonPath("$.responsavelId").doesNotExist());
+    }
+
+    @Test
+    void deveBuscarProgramaPorIdInexistente() throws Exception {
+        when(programas.findById("id-invalido")).thenReturn(Optional.empty());
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .get("/api/programas/id-invalido")
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.message").value("Programa não encontrado com o ID: id-invalido"));
+    }
+
     @ParameterizedTest
-    @CsvSource({"interessado,true", "VOLUNTARIO,true", "RESPONSAVEL,false"})
-    void deveRetornar403ParaPerfilOuStatusSemPermissao(String perfil, boolean ativo) throws Exception {
+    @CsvSource({"interessado,true", "VOLUNTARIO,true"})
+    void deveRetornar403ParaPerfilSemPermissao(String perfil, boolean ativo) throws Exception {
         var usuario = new Usuarios();
         usuario.setId(USUARIO_ID);
         usuario.setTipoUsuario(perfil);
@@ -223,14 +253,271 @@ class ProgramaControllerTest {
         verify(usuarios, never()).save(any());
     }
 
+    // --- C12 / RF05: editar programa ---
+
+    private static final String PROGRAMA_ID = "507f1f77bcf86cd799439022";
+    private static final String EDICAO = """
+            {"nome":"Apoio escolar","descricao":"Reforço para crianças","categoria":["Educação","Inclusão"],
+             "diasDisponiveis":["terça","quinta"],"horarioInicio":"14:00","horarioFim":"17:00","ativo":false}
+            """;
+
+    private Programa programaExistente(String responsavelId) {
+        return new Programa(PROGRAMA_ID, "Apoio", "Apoio à comunidade",
+                java.util.List.of("Educação"), java.util.List.of("segunda"), "09:00", "12:00", true,
+                responsavelId, new java.util.Date(0), null);
+    }
+
+    @Test
+    void deveEditarProgramaExistenteEPersistirAsAlteracoes() throws Exception {
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.of(programaExistente(USUARIO_ID)));
+
+        mvc.perform(put("/api/programas/" + PROGRAMA_ID).header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content(EDICAO))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(PROGRAMA_ID))
+                .andExpect(jsonPath("$.nome").value("Apoio escolar"))
+                .andExpect(jsonPath("$.descricao").value("Reforço para crianças"))
+                .andExpect(jsonPath("$.categoria.length()").value(2))
+                .andExpect(jsonPath("$.diasDisponiveis[1]").value("quinta"))
+                .andExpect(jsonPath("$.horarioInicio").value("14:00"))
+                .andExpect(jsonPath("$.horarioFim").value("17:00"))
+                .andExpect(jsonPath("$.ativo").value(false))
+                .andExpect(jsonPath("$.responsavelId").value(USUARIO_ID))
+                .andExpect(jsonPath("$.dataAtualizacao").isNotEmpty());
+
+        var salvo = org.mockito.ArgumentCaptor.forClass(Programa.class);
+        verify(programas).save(salvo.capture());
+        org.junit.jupiter.api.Assertions.assertEquals(PROGRAMA_ID, salvo.getValue().getId());
+        org.junit.jupiter.api.Assertions.assertEquals("Apoio escolar", salvo.getValue().getNome());
+        org.junit.jupiter.api.Assertions.assertEquals(USUARIO_ID, salvo.getValue().getResponsavelId());
+        org.junit.jupiter.api.Assertions.assertEquals(new java.util.Date(0), salvo.getValue().getDataCadastro());
+        org.junit.jupiter.api.Assertions.assertNotNull(salvo.getValue().getDataAtualizacao());
+    }
+
+    @Test
+    void naoDeveAlterarIdResponsavelOuCadastroEnviadosNaEdicao() throws Exception {
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.of(programaExistente(USUARIO_ID)));
+        var json = (ObjectNode) new JsonMapper().readTree(EDICAO);
+        json.put("id", "507f1f77bcf86cd799439098");
+        json.put("responsavelId", "507f1f77bcf86cd799439099");
+        json.put("dataCadastro", "2000-01-01");
+
+        mvc.perform(put("/api/programas/" + PROGRAMA_ID).header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content(json.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(PROGRAMA_ID))
+                .andExpect(jsonPath("$.responsavelId").value(USUARIO_ID));
+    }
+
+    @Test
+    void deveRetornar404AoEditarProgramaInexistente() throws Exception {
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.empty());
+
+        mvc.perform(put("/api/programas/" + PROGRAMA_ID).header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content(EDICAO))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.message").value("Programa não encontrado com o ID: " + PROGRAMA_ID));
+        verify(programas, never()).save(any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"nome", "descricao", "categoria", "diasDisponiveis", "horarioInicio", "horarioFim", "ativo"})
+    void deveRejeitarEdicaoComCampoAusente(String campo) throws Exception {
+        var json = (ObjectNode) new JsonMapper().readTree(EDICAO);
+        json.remove(campo);
+        conferirEdicaoInvalida(json.toString());
+    }
+
+    @Test
+    void deveRejeitarEdicaoComDadosInvalidos() throws Exception {
+        conferirEdicaoInvalida("{");
+        conferirEdicaoInvalida(EDICAO.replace("\"nome\":\"Apoio escolar\"", "\"nome\":\"   \""));
+        conferirEdicaoInvalida(EDICAO.replace("[\"terça\",\"quinta\"]", "[]"));
+        conferirEdicaoInvalida(EDICAO.replace("\"ativo\":false", "\"ativo\":\"invalido\""));
+    }
+
+    private void conferirEdicaoInvalida(String json) throws Exception {
+        mvc.perform(put("/api/programas/" + PROGRAMA_ID).header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content(json))
+                .andExpect(status().isBadRequest());
+        verify(programas, never()).findById(any());
+        verify(programas, never()).save(any());
+    }
+
+    @Test
+    void deveImpedirEdicaoDeProgramaDeOutroResponsavel() throws Exception {
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.of(programaExistente("507f1f77bcf86cd799439099")));
+
+        mvc.perform(put("/api/programas/" + PROGRAMA_ID).header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content(EDICAO))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("Somente o responsável pelo programa pode editá-lo"));
+        verify(programas, never()).save(any());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"interessado", "VOLUNTARIO"})
+    void deveImpedirEdicaoPorPerfilSemPermissao(String perfil) throws Exception {
+        usuarios.findById(USUARIO_ID).orElseThrow().setTipoUsuario(perfil);
+
+        mvc.perform(put("/api/programas/" + PROGRAMA_ID).header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content(EDICAO))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("Somente um responsável ativo pode editar programas"));
+        verify(programas, never()).save(any());
+    }
+
+    @Test
+    void deveImpedirEdicaoSemTokenOuComTokenInvalido() throws Exception {
+        mvc.perform(put("/api/programas/" + PROGRAMA_ID)
+                        .contentType(MediaType.APPLICATION_JSON).content(EDICAO))
+                .andExpect(status().isForbidden());
+        mvc.perform(put("/api/programas/" + PROGRAMA_ID).header("Authorization", "Bearer token-invalido")
+                        .contentType(MediaType.APPLICATION_JSON).content(EDICAO))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(programas);
+    }
+
+    private static final String DESATIVAR = "/api/usuarios/me/desativar";
+
+    @ParameterizedTest
+    @ValueSource(strings = {"interessado", "VOLUNTARIO"})
+    void desativaParticipanteERecusaMesmoJwtNasProximasOperacoes(String perfil) throws Exception {
+        var participante = usuarios.findById(USUARIO_ID).orElseThrow();
+        participante.setTipoUsuario(perfil);
+        when(usuarios.desativarParticipante(eq(USUARIO_ID), eq(perfil), any())).thenAnswer(chamada -> {
+            participante.setAtivo(false);
+            return 1L;
+        });
+        String autorizacao = "Bearer " + token;
+        mvc.perform(patch(DESATIVAR).header("Authorization", autorizacao)).andExpect(status().isNoContent());
+        mvc.perform(get("/api/usuarios/me").header("Authorization", autorizacao)).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/programas").header("Authorization", autorizacao)).andExpect(status().isUnauthorized());
+        mvc.perform(patch(DESATIVAR).header("Authorization", autorizacao)).andExpect(status().isUnauthorized());
+        verify(usuarios).desativarParticipante(eq(USUARIO_ID), eq(perfil), any());
+        verifyNoInteractions(programas);
+
+        var outraConta = new Usuarios();
+        outraConta.setId("outra");
+        outraConta.setAtivo(true);
+        when(usuarios.findById("outra")).thenReturn(Optional.of(outraConta));
+        String outroJwt = context.getBean(JwtService.class).generateToken("outra", "outra@exemplo.invalid", perfil);
+        mvc.perform(get("/api/usuarios/me").header("Authorization", "Bearer " + outroJwt))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.id").value("outra"));
+    }
+
+    @Test
+    void responsavelNoBancoNaoPodeDesativarMesmoComJwtDeParticipante() throws Exception {
+        mvc.perform(patch(DESATIVAR).header("Authorization", "Bearer " + token)).andExpect(status().isForbidden());
+        verify(usuarios, never()).desativarParticipante(any(), any(), any());
+    }
+
+    @Test
+    void rejeitaIdentidadeEnviadaPeloCliente() throws Exception {
+        usuarios.findById(USUARIO_ID).orElseThrow().setTipoUsuario("VOLUNTARIO");
+        mvc.perform(patch(DESATIVAR + "?id=outra").header("Authorization", "Bearer " + token))
+                .andExpect(status().isBadRequest());
+        mvc.perform(patch(DESATIVAR).header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"id\":\"outra\"}"))
+                .andExpect(status().isBadRequest());
+        verify(usuarios, never()).desativarParticipante(any(), any(), any());
+    }
+
+    @Test
+    void rejeitaDesativacaoSemIdentidadeValida() throws Exception {
+        String chave = Base64.getEncoder().encodeToString(
+                "chave-ficticia-apenas-para-testes-123456789".getBytes(StandardCharsets.UTF_8));
+        String vencido = new JwtService(chave, -60000).generateToken(USUARIO_ID, "ana@exemplo.invalid", "VOLUNTARIO");
+        mvc.perform(patch(DESATIVAR)).andExpect(status().isForbidden());
+        for (String invalido : new String[]{"invalido", vencido}) {
+            mvc.perform(patch(DESATIVAR).header("Authorization", "Bearer " + invalido)).andExpect(status().isForbidden());
+        }
+        when(usuarios.findById(USUARIO_ID)).thenReturn(Optional.empty());
+        mvc.perform(patch(DESATIVAR).header("Authorization", "Bearer " + token)).andExpect(status().isUnauthorized());
+        verify(usuarios, never()).desativarParticipante(any(), any(), any());
+    }
+
+    @Test
+    void permitePreflightDaDesativacaoSemAutenticacao() throws Exception {
+        mvc.perform(options(DESATIVAR).header("Origin", "http://localhost:3000")
+                        .header("Access-Control-Request-Method", "PATCH")
+                        .header("Access-Control-Request-Headers", "Authorization"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3000"));
+    }
+
+    // --- PATCH /{id}/disponibilidade ---
+
+    private static final String DISPONIBILIDADE = "/api/programas/" + PROGRAMA_ID + "/disponibilidade";
+
+    @Test
+    void deveAlterarDisponibilidadeDoPrograma() throws Exception {
+        when(programas.findByIdAndResponsavelId(eq(PROGRAMA_ID), any())).thenReturn(
+                java.util.Optional.of(programaExistente(USUARIO_ID)));
+        when(programas.save(any())).thenAnswer(c -> c.getArgument(0));
+        when(context.getBean(InscricaoRepository.class).findByProgramaIdAndStatusIn(any(), any()))
+                .thenReturn(java.util.List.of());
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .patch(DISPONIBILIDADE)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"ativo\":false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ativo").value(false));
+    }
+
+    @Test
+    void deveRejeitarDisponibilidadeSemCampoAtivo() throws Exception {
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .patch(DISPONIBILIDADE)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void deveRejeitarDisponibilidadeSemToken() throws Exception {
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .patch(DISPONIBILIDADE)
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"ativo\":false}"))
+                .andExpect(status().isForbidden());
+    }
+
+    // --- GET /meus ---
+
+    @Test
+    void deveListarMeusProgramas() throws Exception {
+        var programa = programaExistente(USUARIO_ID);
+        when(programas.findByResponsavelId(USUARIO_ID)).thenReturn(java.util.List.of(programa));
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/programas/meus")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(PROGRAMA_ID));
+    }
+
+    @Test
+    void deveRejeitarListagemDeMeusProgramasSemToken() throws Exception {
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/programas/meus"))
+                .andExpect(status().isForbidden());
+    }
+
     @Configuration
     @EnableWebMvc
     @EnableWebSecurity
-    @Import({SecurityConfig.class, ProgramaController.class, ProgramaService.class,
+    @Import({CorsConfig.class, SecurityConfig.class, ProgramaController.class, ProgramaService.class,
             UsuariosController.class, UsuariosService.class, GlobalExceptionHandler.class})
     static class Config {
         @Bean UsuariosRepository usuariosRepository() { return mock(UsuariosRepository.class); }
         @Bean ProgramaRepository programaRepository() { return mock(ProgramaRepository.class); }
+        @Bean InscricaoRepository inscricaoRepository() { return mock(InscricaoRepository.class); }
         @Bean JwtService jwtService() {
             String chaveFicticia = Base64.getEncoder().encodeToString(
                     "chave-ficticia-apenas-para-testes-123456789".getBytes(StandardCharsets.UTF_8));

@@ -7,6 +7,8 @@ import br.com.senac.migus.model.Usuarios;
 import br.com.senac.migus.repository.UsuariosRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -23,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -69,11 +72,12 @@ class AuthServiceTest {
         verify(passwordEncoder).encode("senha-segura");
     }
 
-    @Test
-    void deveCadastrarComoResponsavelQuandoEmailForDoDominioMigus() {
-        var request = new CadastroRequestDTO("Bia", "Bia@Migus.com.br", "senha-segura",
+    @ParameterizedTest
+    @CsvSource({"Bia@Migus.com.br,bia@migus.com.br", "Bia@Migus.com,bia@migus.com"})
+    void deveCadastrarComoResponsavelQuandoEmailForDoDominioMigus(String email, String normalizado) {
+        var request = new CadastroRequestDTO("Bia", email, "senha-segura",
                 "12345678900", null, null);
-        when(usuariosRepository.existsByEmail("bia@migus.com.br")).thenReturn(false);
+        when(usuariosRepository.existsByEmail(normalizado)).thenReturn(false);
         when(usuariosRepository.existsByCpf("12345678900")).thenReturn(false);
         when(passwordEncoder.encode("senha-segura")).thenReturn("hash");
         when(usuariosRepository.save(any(Usuarios.class)))
@@ -81,7 +85,10 @@ class AuthServiceTest {
 
         var resposta = authService.cadastrar(request);
 
-        assertEquals("responsavel", resposta.usuario().tipoUsuario());
+        assertEquals("RESPONSAVEL", resposta.usuario().tipoUsuario());
+        assertEquals(normalizado, resposta.usuario().email());
+        verify(usuariosRepository).save(argThat(usuario -> "RESPONSAVEL".equals(usuario.getTipoUsuario())
+                && normalizado.equals(usuario.getEmail())));
     }
 
     @Test
@@ -192,6 +199,19 @@ class AuthServiceTest {
 
         assertEquals(HttpStatus.FORBIDDEN, exception.getStatus());
         verify(jwtService, never()).generateToken(any(), any(), any());
+    }
+
+    @Test
+    void deveLancarExcecaoParaIdadeMenorQue17Anos() {
+        LocalDate menorDeIdade = LocalDate.now().minusYears(16);
+        var req = new CadastroRequestDTO("Ana", "nova@exemplo.com", "senha-ok12",
+                "99988877766", null, menorDeIdade);
+        when(usuariosRepository.existsByEmail(any())).thenReturn(false);
+        when(usuariosRepository.existsByCpf(any())).thenReturn(false);
+
+        var erro = assertThrows(AuthException.class, () -> authService.cadastrar(req));
+        assertEquals(HttpStatus.BAD_REQUEST, erro.getStatus());
+        verify(usuariosRepository, never()).save(any());
     }
 
     private CadastroRequestDTO cadastroRequest() {
