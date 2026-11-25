@@ -199,7 +199,7 @@ class UsuariosControllerTest {
     @Test
     void exportarMeusDados_deveRetornar200ComDadosEInscricoes() throws Exception {
         var inscricao = new MinhaInscricaoDTO("insc-1", "prog-1", "Apoio",
-                new java.util.Date(), "APROVADA", null, null);
+                new java.util.Date(), "APROVADA", null, null, true, null);
         var export = new DadosPessoaisExportDTO(
                 "user-1", "João", "joao@email.com", "12345678901", null,
                 LocalDate.of(1990, 1, 1), "VOLUNTARIO", true,

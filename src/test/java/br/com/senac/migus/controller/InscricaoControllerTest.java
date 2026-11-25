@@ -79,6 +79,19 @@ class InscricaoControllerTest {
     // --- POST /inscrever ---
 
     @Test
+    void deveBloquearNovaInscricaoPelaApiQuandoJaExiste() throws Exception {
+        when(programas.findById(PROGRAMA_ID)).thenReturn(Optional.of(
+                br.com.senac.migus.ControllerTestHelper.programaAtivo(PROGRAMA_ID, USUARIO_ID)));
+        when(inscricoes.existsByVoluntarioIdAndProgramaId(USUARIO_ID, PROGRAMA_ID)).thenReturn(true);
+
+        mvc.perform(post("/api/programas/{pId}/inscricoes", PROGRAMA_ID)
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Você já está inscrito neste programa"));
+        verify(inscricoes, never()).save(any());
+    }
+
+    @Test
     void deveInscreverVoluntarioERetornar201() throws Exception {
         var inscricao = new Inscricao(INSCRICAO_ID, USUARIO_ID, PROGRAMA_ID, "PENDENTE",
                 new Date(), null, null, null);
