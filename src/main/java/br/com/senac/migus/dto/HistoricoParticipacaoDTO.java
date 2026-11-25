@@ -12,7 +12,9 @@ public record HistoricoParticipacaoDTO(
         Date dataInscricao,
         Date inicioParticipacao,
         Date fimParticipacao,
-        String situacao
+        String situacao,
+        Boolean programaAtivo,
+        Date dataReativacao
 ) {
     public static HistoricoParticipacaoDTO of(Inscricao inscricao, Programa programa) {
         String situacao = inscricao.getStatus();
@@ -29,6 +31,8 @@ public record HistoricoParticipacaoDTO(
         return new HistoricoParticipacaoDTO(
                 inscricao.getId(), inscricao.getProgramaId(),
                 programa == null ? null : programa.getNome(), inscricao.getDataInscricao(),
-                inicio, fim, situacao);
+                inicio, fim, situacao,
+                programa == null ? null : programa.getAtivo(),
+                programa == null ? null : programa.getDataReativacao());
     }
 }

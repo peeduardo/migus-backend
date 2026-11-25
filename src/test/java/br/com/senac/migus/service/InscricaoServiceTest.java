@@ -292,7 +292,7 @@ class InscricaoServiceTest {
 
     @Test
     void deveRejeitarInscricaoDuplicada() {
-        when(inscricoes.existsByVoluntarioIdAndProgramaIdAndStatusNot(USUARIO_ID, PROGRAMA_ID, "SUSPENSA")).thenReturn(true);
+        when(inscricoes.existsByVoluntarioIdAndProgramaId(USUARIO_ID, PROGRAMA_ID)).thenReturn(true);
         var erro = assertThrows(AuthException.class, () -> service.inscrever(PROGRAMA_ID, USUARIO_ID, null));
         assertEquals(HttpStatus.CONFLICT, erro.getStatus());
         verify(inscricoes, never()).save(any());

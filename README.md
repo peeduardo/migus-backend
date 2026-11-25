@@ -90,3 +90,14 @@ quando o programa não existe.
 Os testes de `ProgramaServiceTest` e `ProgramaControllerTest` usam repositories
 simulados e conferem o objeto enviado ao `save`. Eles não comprovam persistência
 real no MongoDB; para isso, valide com a aplicação conectada ao banco de testes.
+
+## Disponibilidade e inscrições
+
+Inativar ou reativar um programa preserva as inscrições e suas situações.
+As consultas pessoais informam a disponibilidade separadamente. A reativação
+registrada pelo servidor permite mostrar o aviso de retorno do programa.
+Inscrições antigas em `SUSPENSA` não são restauradas automaticamente.
+
+A API impede nova inscrição quando o par usuário/programa já existe. A garantia
+contra solicitações simultâneas ainda depende do alinhamento e validação de um
+índice único, que não é criado automaticamente.

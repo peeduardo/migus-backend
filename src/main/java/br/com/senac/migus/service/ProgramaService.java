@@ -5,9 +5,7 @@ import br.com.senac.migus.exception.AuthException;
 import br.com.senac.migus.exception.ResourceNotFoundException;
 
 import br.com.senac.migus.dto.ProgramaRequestDTO;
-import br.com.senac.migus.model.Inscricao;
 import br.com.senac.migus.model.Programa;
-import br.com.senac.migus.repository.InscricaoRepository;
 import br.com.senac.migus.repository.ProgramaRepository;
 import br.com.senac.migus.repository.UsuariosRepository;
 import org.bson.types.ObjectId;
@@ -21,13 +19,10 @@ import java.util.List;
 public class ProgramaService {
     private final ProgramaRepository programas;
     private final UsuariosRepository usuarios;
-    private final InscricaoRepository inscricoes;
 
-    public ProgramaService(ProgramaRepository programas, UsuariosRepository usuarios,
-                           InscricaoRepository inscricoes) {
+    public ProgramaService(ProgramaRepository programas, UsuariosRepository usuarios) {
         this.programas = programas;
         this.usuarios = usuarios;
-        this.inscricoes = inscricoes;
     }
 
     public Programa cadastrar(ProgramaRequestDTO pedido, String usuarioId) {
@@ -82,6 +77,7 @@ public class ProgramaService {
                 programa.getResponsavelId(),
                 programa.getDataCadastro(),
                 new Date());
+        registrarReativacao(programa, programaAtualizado);
         return programas.save(programaAtualizado);
     }
 
@@ -124,22 +120,14 @@ public class ProgramaService {
                 programa.getDataCadastro(),
                 new Date());
 
-        programas.save(programaAtualizado);
-
-        if (!Boolean.TRUE.equals(ativo)) {
-            cancelarInscricoesAtivas(programaId);
-        }
-
-        return programaAtualizado;
+        registrarReativacao(programa, programaAtualizado);
+        return programas.save(programaAtualizado);
     }
 
-    private void cancelarInscricoesAtivas(String programaId) {
-        List<Inscricao> ativas = inscricoes.findByProgramaIdAndStatusIn(
-                programaId, List.of("PENDENTE", "APROVADA"));
-        if (ativas.isEmpty()) return;
-        Date agora = new Date();
-        ativas.forEach(i -> i.suspender(agora));
-        inscricoes.saveAll(ativas);
+    private void registrarReativacao(Programa anterior, Programa atualizado) {
+        atualizado.setDataReativacao(Boolean.FALSE.equals(anterior.getAtivo())
+                && Boolean.TRUE.equals(atualizado.getAtivo())
+                ? atualizado.getDataAtualizacao() : anterior.getDataReativacao());
     }
 
     public List<Programa> listarMeusProgramas(String usuarioId) {

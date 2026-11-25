@@ -23,6 +23,7 @@ public class Programa {
     private String responsavelId;
     private Date dataCadastro;
     private Date dataAtualizacao;
+    private Date dataReativacao;
 
     public Programa(String id, String nome, String descricao, List<String> categoria,
                     List<String> diasDisponiveis, String horarioInicio, String horarioFim,
@@ -72,5 +73,11 @@ public class Programa {
     }
     public Date getDataAtualizacao() {
         return dataAtualizacao;
+    }
+    public Date getDataReativacao() {
+        return dataReativacao;
+    }
+    public void setDataReativacao(Date dataReativacao) {
+        this.dataReativacao = dataReativacao;
     }
 }

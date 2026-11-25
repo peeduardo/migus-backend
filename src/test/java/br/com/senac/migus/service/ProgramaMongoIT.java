@@ -2,7 +2,6 @@ package br.com.senac.migus.service;
 
 import br.com.senac.migus.dto.ProgramaRequestDTO;
 import br.com.senac.migus.model.Usuarios;
-import br.com.senac.migus.repository.InscricaoRepository;
 import br.com.senac.migus.repository.ProgramaRepository;
 import br.com.senac.migus.repository.UsuariosRepository;
 import com.mongodb.ConnectionString;
@@ -49,8 +48,7 @@ class ProgramaMongoIT {
             var factory = new MongoRepositoryFactory(mongo);
             var usuarios = factory.getRepository(UsuariosRepository.class);
             var programas = factory.getRepository(ProgramaRepository.class);
-            var inscricoes = factory.getRepository(InscricaoRepository.class);
-            var service = new ProgramaService(programas, usuarios, inscricoes);
+            var service = new ProgramaService(programas, usuarios);
             var responsavel = new Usuarios();
             String usuarioId = new ObjectId().toHexString();
             String nomePrograma = "Programa de teste " + UUID.randomUUID();
@@ -82,6 +80,14 @@ class ProgramaMongoIT {
                 assertInstanceOf(ObjectId.class, documento.get("_id"));
                 assertInstanceOf(ObjectId.class, documento.get("responsavelId"));
                 assertInstanceOf(Date.class, documento.get("dataCadastro"));
+                service.alterarDisponibilidade(salvo.getId(), false, usuarioId);
+                assertFalse(programas.findById(salvo.getId()).orElseThrow().getAtivo());
+                service.alterarDisponibilidade(salvo.getId(), true, usuarioId);
+                var reativado = programas.findById(salvo.getId()).orElseThrow();
+                assertTrue(reativado.getAtivo());
+                assertNotNull(reativado.getDataReativacao());
+                assertEquals(salvo.getDataCadastro(), reativado.getDataCadastro());
+                assertEquals(salvo.getResponsavelId(), reativado.getResponsavelId());
             } finally {
                 // Identificadores exclusivos desta execução; nunca remove coleções.
                 try {

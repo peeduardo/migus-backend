@@ -39,7 +39,7 @@ class ProgramaServiceTest {
                 List.of("segunda"), "09:00", "12:00", true);
 
         var erro = assertThrows(AuthException.class,
-                () -> new ProgramaService(programas, usuarios, inscricoes).cadastrar(pedido, usuario.getId()));
+                () -> new ProgramaService(programas, usuarios).cadastrar(pedido, usuario.getId()));
 
         assertEquals(HttpStatus.FORBIDDEN, erro.getStatus());
         verify(programas, never()).save(any());
@@ -54,7 +54,7 @@ class ProgramaServiceTest {
                 "responsavel-id", new Date(), null);
         when(programas.findById("507f1f77bcf86cd799439011")).thenReturn(Optional.of(programa));
 
-        var dto = new ProgramaService(programas, usuarios, inscricoes).buscarPorId("507f1f77bcf86cd799439011");
+        var dto = new ProgramaService(programas, usuarios).buscarPorId("507f1f77bcf86cd799439011");
 
         assertEquals("507f1f77bcf86cd799439011", dto.id());
         assertEquals("Apoio", dto.nome());
@@ -71,7 +71,7 @@ class ProgramaServiceTest {
         when(programas.findById("inexistente")).thenReturn(Optional.empty());
 
         var ex = assertThrows(br.com.senac.migus.exception.ResourceNotFoundException.class,
-                () -> new ProgramaService(programas, usuarios, inscricoes).buscarPorId("inexistente"));
+                () -> new ProgramaService(programas, usuarios).buscarPorId("inexistente"));
 
         assertEquals("Programa não encontrado com o ID: inexistente", ex.getMessage());
     }
@@ -90,7 +90,7 @@ class ProgramaServiceTest {
                 List.of("segunda"), "09:00", "12:00", false);
         var inicio = new Date();
 
-        var programa = new ProgramaService(programas, usuarios, mock(InscricaoRepository.class)).cadastrar(pedido, responsavel.getId());
+        var programa = new ProgramaService(programas, usuarios).cadastrar(pedido, responsavel.getId());
 
         assertTrue(ObjectId.isValid(programa.getId()));
         assertEquals(responsavel.getId(), programa.getResponsavelId());
@@ -107,7 +107,7 @@ class ProgramaServiceTest {
         verify(programas).save(programa);
     }
     private ProgramaService service() {
-        return new ProgramaService(programas, usuarios, inscricoes);
+        return new ProgramaService(programas, usuarios);
     }
     private ProgramaRepository programas = mock(ProgramaRepository.class);
     private UsuariosRepository usuarios = mock(UsuariosRepository.class);
@@ -282,27 +282,31 @@ class ProgramaServiceTest {
         verify(programas, never()).save(any());
     }
 
-    @Test
-    void deveAlterarDisponibilidadeSuspendendoInscricoesAtivas() {
-        String progId = "prog-sust";
-        var r = responsavel("resp-1", "RESPONSAVEL", true);
-        when(usuarios.findById("resp-1")).thenReturn(Optional.of(r));
-        when(programas.findByIdAndResponsavelId(progId, "resp-1")).thenReturn(Optional.of(programa(progId, "resp-1")));
-        when(programas.save(any())).thenAnswer(c -> c.getArgument(0));
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"PENDENTE", "APROVADA", "RECUSADA", "CANCELADA", "SAIDA", "TRANSFERIDA", "SUSPENSA"})
+    void devePreservarInscricaoAoInativarEReativar(String status) {
+        String progId = "prog-preservado";
+        when(usuarios.findById("resp-1")).thenReturn(Optional.of(responsavel("resp-1", "RESPONSAVEL", true)));
+        var atual = new java.util.concurrent.atomic.AtomicReference<>(programa(progId, "resp-1"));
+        when(programas.findByIdAndResponsavelId(progId, "resp-1")).thenAnswer(c -> Optional.of(atual.get()));
+        when(programas.save(any())).thenAnswer(c -> { atual.set(c.getArgument(0)); return atual.get(); });
+        var data = new Date(1000);
+        var inscricao = new br.com.senac.migus.model.Inscricao("i1", "vol1", progId, status,
+                data, "APROVADA".equals(status) ? data : null, null, data);
+        inscricao.setMensagem("Quero participar");
+        inscricao.setRecado("Recado original");
+        when(inscricoes.findByProgramaIdAndStatusIn(eq(progId), any())).thenAnswer(c ->
+                ((List<?>) c.getArgument(1)).contains(inscricao.getStatus()) ? List.of(inscricao) : List.of());
 
-        var pendente = new br.com.senac.migus.model.Inscricao("i1", "vol1", progId, "PENDENTE",
-                new java.util.Date(), null, null, null);
-        var aprovada = new br.com.senac.migus.model.Inscricao("i2", "vol2", progId, "APROVADA",
-                new java.util.Date(), new java.util.Date(), null, null);
-        when(inscricoes.findByProgramaIdAndStatusIn(eq(progId), any()))
-                .thenReturn(List.of(pendente, aprovada));
-        when(inscricoes.saveAll(any())).thenReturn(List.of());
-
-        service().alterarDisponibilidade(progId, false, "resp-1");
-
-        verify(inscricoes).saveAll(argThat(lista -> {
-            var l = (java.util.List<?>) lista;
-            return l.stream().allMatch(i -> "SUSPENSA".equals(((br.com.senac.migus.model.Inscricao) i).getStatus()));
-        }));
+        for (boolean ativo : new boolean[]{false, false, true, true, false, true}) {
+            assertEquals(ativo, service().alterarDisponibilidade(progId, ativo, "resp-1").getAtivo());
+            assertEquals(status, inscricao.getStatus());
+            assertEquals(data, inscricao.getDataInscricao());
+            assertEquals(data, inscricao.getDataAtualizacao());
+            assertEquals("Quero participar", inscricao.getMensagem());
+            assertEquals("Recado original", inscricao.getRecado());
+        }
+        verify(inscricoes, never()).saveAll(any());
+        verify(inscricoes, never()).save(any());
     }
 }
